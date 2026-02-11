@@ -1,0 +1,1880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strength Training Tracker</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Lucide Icons as inline SVGs
+        const Calendar = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+        );
+
+        const TrendingUp = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                <polyline points="17 6 23 6 23 12"></polyline>
+            </svg>
+        );
+
+        const Dumbbell = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M14.4 14.4 9.6 9.6"></path>
+                <path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"></path>
+                <path d="m21.5 21.5-1.4-1.4"></path>
+                <path d="M3.9 3.9 2.5 2.5"></path>
+                <path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"></path>
+            </svg>
+        );
+
+        const Save = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+        );
+
+        const Download = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+        );
+
+        const Upload = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+        );
+
+        const Repeat = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <polyline points="17 1 21 5 17 9"></polyline>
+                <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                <polyline points="7 23 3 19 7 15"></polyline>
+                <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+            </svg>
+        );
+
+        // Simple localStorage wrapper for storage API
+        const storage = {
+            get: (key) => {
+                try {
+                    const value = localStorage.getItem(key);
+                    return value ? { key, value, shared: false } : null;
+                } catch (error) {
+                    throw error;
+                }
+            },
+            set: (key, value) => {
+                try {
+                    localStorage.setItem(key, value);
+                    return { key, value, shared: false };
+                } catch (error) {
+                    return null;
+                }
+            },
+            delete: (key) => {
+                try {
+                    localStorage.removeItem(key);
+                    return { key, deleted: true, shared: false };
+                } catch (error) {
+                    return null;
+                }
+            }
+        };
+
+        const StrengthTrainingApp = () => {
+            const [currentMonth, setCurrentMonth] = useState(1);
+            const [selectedDay, setSelectedDay] = useState(1);
+            const [workoutData, setWorkoutData] = useState({});
+            const [loading, setLoading] = useState(true);
+            const [activeTab, setActiveTab] = useState('workout');
+            const [selectedPlan, setSelectedPlan] = useState('hypertrophy');
+            const [workoutType, setWorkoutType] = useState('strength'); // 'strength' or 'conditioning'
+            const [conditioningType, setConditioningType] = useState('explosive');
+            const [trainingDays, setTrainingDays] = useState(2);
+            const [dayTypes, setDayTypes] = useState({});
+            const [splitType, setSplitType] = useState('full-body'); // 'full-body', 'push-pull-legs', 'upper-lower'
+            const [customExercises, setCustomExercises] = useState({}); // Store custom/swapped exercises per day
+            const [showStartingWeights, setShowStartingWeights] = useState(false);
+            const [startingWeights, setStartingWeights] = useState({});
+
+            const trainingPlans = {
+                hypertrophy: {
+                    name: "Hypertrophy",
+                    description: "Muscle growth and size",
+                    mainLiftSets: 4,
+                    mainLiftReps: 10,
+                    accessorySets: 3,
+                    accessoryReps: 12,
+                    rest: "60-90s",
+                    color: "from-purple-500 to-pink-600"
+                },
+                strength: {
+                    name: "Strength",
+                    description: "Maximum force production",
+                    mainLiftSets: 5,
+                    mainLiftReps: 5,
+                    accessorySets: 3,
+                    accessoryReps: 8,
+                    rest: "3-5min",
+                    color: "from-red-500 to-orange-600"
+                },
+                power: {
+                    name: "Power",
+                    description: "Explosive strength and speed",
+                    mainLiftSets: 5,
+                    mainLiftReps: 3,
+                    accessorySets: 3,
+                    accessoryReps: 5,
+                    rest: "3-5min",
+                    color: "from-yellow-500 to-orange-500"
+                },
+                endurance: {
+                    name: "Endurance",
+                    description: "Muscular endurance and stamina",
+                    mainLiftSets: 3,
+                    mainLiftReps: 15,
+                    accessorySets: 3,
+                    accessoryReps: 20,
+                    rest: "30-45s",
+                    color: "from-green-500 to-teal-600"
+                }
+            };
+
+            const conditioningWorkouts = {
+                explosive: {
+                    name: "Explosive",
+                    description: "Power and speed development",
+                    instruction: "⚡ DO ALL 5 EXERCISES IN ORDER • Rest as indicated • Focus on maximum explosive power each rep",
+                    howTo: "Start with exercise 1, complete all 5 sets with rest, then move to exercise 2. Complete all exercises 1→2→3→4→5.",
+                    exercises: [
+                        { name: "Box Jumps", sets: 5, reps: 5, rest: "2min" },
+                        { name: "Medicine Ball Slams", sets: 4, reps: 8, rest: "90s" },
+                        { name: "Broad Jumps", sets: 5, reps: 5, rest: "2min" },
+                        { name: "Kettlebell Swings", sets: 4, reps: 15, rest: "90s" },
+                        { name: "Sprint Intervals", sets: 6, reps: "20s", rest: "2min" }
+                    ],
+                    color: "from-orange-500 to-red-600"
+                },
+                circuit: {
+                    name: "Circuit Training",
+                    description: "Total body conditioning",
+                    instruction: "🔄 DO 1→2→3→4→5→6 WITHOUT REST • After exercise 6, rest 60s then repeat • Complete 3 TOTAL ROUNDS",
+                    howTo: "This is a circuit! Do one set of each exercise back-to-back (Burpees→Swings→Ropes→Steps→Climbers→Plank), then rest 60 seconds. Repeat for 3 total rounds.",
+                    exercises: [
+                        { name: "Burpees", sets: "3 rounds", reps: 15, rest: "→ Next" },
+                        { name: "Kettlebell Swings", sets: "3 rounds", reps: 20, rest: "→ Next" },
+                        { name: "Battle Ropes", sets: "3 rounds", reps: "30s", rest: "→ Next" },
+                        { name: "Box Step-ups", sets: "3 rounds", reps: 20, rest: "→ Next" },
+                        { name: "Mountain Climbers", sets: "3 rounds", reps: 30, rest: "→ Next" },
+                        { name: "Plank", sets: "3 rounds", reps: "60s", rest: "60s rest, then restart circuit" }
+                    ],
+                    color: "from-blue-500 to-cyan-600"
+                },
+                mma: {
+                    name: "MMA/Wrestling",
+                    description: "Fight conditioning - 5 rounds",
+                    instruction: "🥊 DO 1→2→3→4→5→6→7→8 WITHOUT REST • After exercise 8, rest 90s then repeat • Complete 5 TOTAL ROUNDS",
+                    howTo: "Fight-style circuit! Do exercises 1-8 back-to-back with no rest between. After plank (exercise 8), rest 90 seconds. That's 1 round. Complete 5 rounds total. This simulates 5 rounds of fighting.",
+                    exercises: [
+                        { name: "Burpees", sets: "5 rounds", reps: 15, rest: "→ Next" },
+                        { name: "Sprawls", sets: "5 rounds", reps: 20, rest: "→ Next" },
+                        { name: "Battle Ropes", sets: "5 rounds", reps: "45s", rest: "→ Next" },
+                        { name: "Medicine Ball Slams", sets: "5 rounds", reps: 15, rest: "→ Next" },
+                        { name: "Shadow Boxing", sets: "5 rounds", reps: "60s", rest: "→ Next" },
+                        { name: "Mountain Climbers", sets: "5 rounds", reps: 30, rest: "→ Next" },
+                        { name: "Kettlebell Swings", sets: "5 rounds", reps: 20, rest: "→ Next" },
+                        { name: "Plank", sets: "5 rounds", reps: "45s", rest: "90s rest, then Round 2" }
+                    ],
+                    color: "from-red-600 to-orange-700"
+                },
+                boxing: {
+                    name: "Boxing Bag",
+                    description: "Heavy bag work - 6 rounds + finisher",
+                    instruction: "🥊 DO ROUNDS 1-6 ON THE BAG (3min work / 1min rest) • Then finish with Burpees and Mountain Climbers",
+                    howTo: "Work the heavy bag for 3 minutes, rest 1 minute, repeat. Focus changes each round. After 6 rounds (24 min total), finish with bodyweight exercises for conditioning.",
+                    exercises: [
+                        { name: "Round 1: Jab-Cross", sets: 1, reps: "3min", rest: "1min rest" },
+                        { name: "Round 2: Jab-Cross-Hook", sets: 1, reps: "3min", rest: "1min rest" },
+                        { name: "Round 3: Full Combos", sets: 1, reps: "3min", rest: "1min rest" },
+                        { name: "Round 4: Power Shots", sets: 1, reps: "3min", rest: "1min rest" },
+                        { name: "Round 5: Speed Work", sets: 1, reps: "3min", rest: "1min rest" },
+                        { name: "Round 6: Body Shots", sets: 1, reps: "3min", rest: "2min rest" },
+                        { name: "Burpees", sets: 3, reps: 10, rest: "30s" },
+                        { name: "Mountain Climbers", sets: 3, reps: 20, rest: "Done!" }
+                    ],
+                    color: "from-yellow-600 to-red-700"
+                },
+                vo2max: {
+                    name: "VO2 Max",
+                    description: "High intensity intervals",
+                    instruction: "⚡ PICK ONE EXERCISE ONLY • Do all intervals for that exercise • This is a full session",
+                    howTo: "Choose ONE cardio machine/exercise from the list. Do all 6-8 intervals of max effort followed by recovery. Don't do multiple - one is enough!",
+                    exercises: [
+                        { name: "Bike Sprints", sets: 8, reps: "30s on / 90s off", rest: "Complete rest between" },
+                        { name: "Rowing Intervals", sets: 6, reps: "45s on / 2min off", rest: "Active recovery" },
+                        { name: "Running Hills", sets: 6, reps: "60s sprint", rest: "Walk back down" },
+                        { name: "Ski Erg", sets: 8, reps: "30s on / 90s off", rest: "Complete rest" }
+                    ],
+                    color: "from-red-500 to-pink-600"
+                },
+                zone2: {
+                    name: "Zone 2 Cardio",
+                    description: "Aerobic base building",
+                    instruction: "🚶 PICK ONE EXERCISE ONLY • Maintain steady conversational pace • Focus on consistency not speed",
+                    howTo: "Choose ONE steady-state cardio activity. You should be able to talk in full sentences throughout. This builds your aerobic base - don't go too hard!",
+                    exercises: [
+                        { name: "Easy Run/Jog", sets: 1, reps: "30-60min", rest: "Conversational pace" },
+                        { name: "Cycling", sets: 1, reps: "45-90min", rest: "60-70% max HR" },
+                        { name: "Rowing", sets: 1, reps: "30-45min", rest: "Steady state" },
+                        { name: "Incline Walk", sets: 1, reps: "30-45min", rest: "3-4mph, 10-15% incline" }
+                    ],
+                    color: "from-green-500 to-emerald-600"
+                }
+            };
+
+            const monthPrograms = {
+                1: { description: "Hypertrophy", mainLiftReps: 12 },
+                2: { description: "Hypertrophy", mainLiftReps: 10 },
+                3: { description: "Strength", mainLiftReps: 8 },
+                4: { description: "Strength", mainLiftReps: 5 },
+                5: { description: "Power", mainLiftReps: 3 },
+                6: { description: "Power", mainLiftReps: 2 }
+            };
+
+            const exerciseDatabase = {
+                // LOWER BODY - QUAD DOMINANT
+                "Back Squat": { category: "lower", type: "quad", isCompound: true, difficulty: "advanced" },
+                "Front Squat": { category: "lower", type: "quad", isCompound: true, difficulty: "advanced" },
+                "Goblet Squat": { category: "lower", type: "quad", isCompound: true, difficulty: "beginner" },
+                "Hack Squat": { category: "lower", type: "quad", isCompound: true, difficulty: "intermediate" },
+                "Bulgarian Split Squat": { category: "lower", type: "quad", isCompound: true, difficulty: "intermediate" },
+                "Leg Press": { category: "lower", type: "quad", isCompound: true, difficulty: "beginner" },
+                "Lunge": { category: "lower", type: "quad", isCompound: true, difficulty: "beginner" },
+                "Step-up": { category: "lower", type: "quad", isCompound: true, difficulty: "beginner" },
+                
+                // LOWER BODY - HIP/GLUTE DOMINANT
+                "Conventional Deadlift": { category: "lower", type: "hip", isCompound: true, difficulty: "advanced" },
+                "Sumo Deadlift": { category: "lower", type: "hip", isCompound: true, difficulty: "advanced" },
+                "Trap Bar Deadlift": { category: "lower", type: "hip", isCompound: true, difficulty: "intermediate" },
+                "Romanian Deadlift": { category: "lower", type: "hip", isCompound: true, difficulty: "intermediate" },
+                "Zercher Squat": { category: "lower", type: "hip", isCompound: true, difficulty: "advanced" },
+                "Hip Thrust": { category: "lower", type: "hip", isCompound: true, difficulty: "beginner" },
+                "Glute Bridge": { category: "lower", type: "hip", isCompound: true, difficulty: "beginner" },
+                "Good Morning": { category: "lower", type: "hip", isCompound: true, difficulty: "intermediate" },
+                "Kettlebell Swing": { category: "lower", type: "hip", isCompound: true, difficulty: "beginner" },
+                "Power Clean": { category: "lower", type: "hip", isCompound: true, difficulty: "advanced" },
+                "Hang Clean": { category: "lower", type: "hip", isCompound: true, difficulty: "advanced" },
+                "Clean & Jerk": { category: "lower", type: "hip", isCompound: true, difficulty: "advanced" },
+                "Clean & Press": { category: "lower", type: "hip", isCompound: true, difficulty: "advanced" },
+                
+                // UPPER BODY - HORIZONTAL PUSH
+                "Bench Press": { category: "upper", type: "push-h", isCompound: true, difficulty: "intermediate" },
+                "Incline Bench Press": { category: "upper", type: "push-h", isCompound: true, difficulty: "intermediate" },
+                "Dumbbell Bench Press": { category: "upper", type: "push-h", isCompound: true, difficulty: "beginner" },
+                "Push-up": { category: "upper", type: "push-h", isCompound: true, difficulty: "beginner" },
+                "Dip": { category: "upper", type: "push-h", isCompound: true, difficulty: "intermediate" },
+                "Chest Fly": { category: "upper", type: "push-h", isCompound: false, difficulty: "beginner" },
+                
+                // UPPER BODY - VERTICAL PUSH
+                "Overhead Press": { category: "upper", type: "push-v", isCompound: true, difficulty: "intermediate" },
+                "Military Press": { category: "upper", type: "push-v", isCompound: true, difficulty: "intermediate" },
+                "Arnold Press": { category: "upper", type: "push-v", isCompound: true, difficulty: "intermediate" },
+                "Seated Dumbbell Press": { category: "upper", type: "push-v", isCompound: true, difficulty: "beginner" },
+                "Lateral Raise": { category: "upper", type: "push-v", isCompound: false, difficulty: "beginner" },
+                "Upright Row": { category: "upper", type: "push-v", isCompound: true, difficulty: "intermediate" },
+                
+                // UPPER BODY - HORIZONTAL PULL
+                "Barbell Row": { category: "upper", type: "pull-h", isCompound: true, difficulty: "intermediate" },
+                "Dumbbell Row": { category: "upper", type: "pull-h", isCompound: true, difficulty: "beginner" },
+                "One Arm Row": { category: "upper", type: "pull-h", isCompound: true, difficulty: "beginner" },
+                "Supported Row": { category: "upper", type: "pull-h", isCompound: true, difficulty: "beginner" },
+                "Seated Cable Row": { category: "upper", type: "pull-h", isCompound: true, difficulty: "beginner" },
+                "T-Bar Row": { category: "upper", type: "pull-h", isCompound: true, difficulty: "intermediate" },
+                "Pendlay Row": { category: "upper", type: "pull-h", isCompound: true, difficulty: "advanced" },
+                
+                // UPPER BODY - VERTICAL PULL
+                "Pull-up": { category: "upper", type: "pull-v", isCompound: true, difficulty: "intermediate" },
+                "Chin-up": { category: "upper", type: "pull-v", isCompound: true, difficulty: "intermediate" },
+                "Lat Pulldown": { category: "upper", type: "pull-v", isCompound: true, difficulty: "beginner" },
+                "Neutral Grip Pull-up": { category: "upper", type: "pull-v", isCompound: true, difficulty: "intermediate" },
+                
+                // ACCESSORY
+                "Bicep Curl": { category: "upper", type: "accessory", isCompound: false, difficulty: "beginner" },
+                "Hammer Curl": { category: "upper", type: "accessory", isCompound: false, difficulty: "beginner" },
+                "Tricep Extension": { category: "upper", type: "accessory", isCompound: false, difficulty: "beginner" },
+                "Face Pull": { category: "upper", type: "accessory", isCompound: false, difficulty: "beginner" },
+                "Upright Row": { category: "upper", type: "accessory", isCompound: false, difficulty: "beginner" },
+                "Shrug": { category: "upper", type: "accessory", isCompound: false, difficulty: "beginner" },
+                "Calf Raise": { category: "lower", type: "accessory", isCompound: false, difficulty: "beginner" },
+                "Leg Curl": { category: "lower", type: "accessory", isCompound: false, difficulty: "beginner" },
+                "Leg Extension": { category: "lower", type: "accessory", isCompound: false, difficulty: "beginner" }
+            };
+
+            // Exercise templates based on split type
+            const splitTemplates = {
+                'full-body': {
+                    1: [
+                        { name: "Trap Bar Deadlift", isMainLift: true },
+                        { name: "Military Press", isMainLift: true },
+                        { name: "Lunge", isMainLift: false },
+                        { name: "Pull-up", isMainLift: false, reps: "max" },
+                        { name: "Incline Bench Press", isMainLift: false },
+                        { name: "Face Pull", isMainLift: false }
+                    ],
+                    2: [
+                        { name: "Back Squat", isMainLift: true },
+                        { name: "Bench Press", isMainLift: true },
+                        { name: "Romanian Deadlift", isMainLift: false },
+                        { name: "Barbell Row", isMainLift: false },
+                        { name: "Overhead Press", isMainLift: false },
+                        { name: "Bicep Curl", isMainLift: false }
+                    ],
+                    3: [
+                        { name: "Front Squat", isMainLift: true },
+                        { name: "Incline Bench Press", isMainLift: true },
+                        { name: "Conventional Deadlift", isMainLift: false },
+                        { name: "Lat Pulldown", isMainLift: false },
+                        { name: "Dip", isMainLift: false },
+                        { name: "Lateral Raise", isMainLift: false }
+                    ]
+                },
+                'push-pull-legs': {
+                    1: [ // PUSH
+                        { name: "Bench Press", isMainLift: true },
+                        { name: "Overhead Press", isMainLift: true },
+                        { name: "Incline Dumbbell Press", isMainLift: false },
+                        { name: "Dip", isMainLift: false },
+                        { name: "Lateral Raise", isMainLift: false },
+                        { name: "Tricep Extension", isMainLift: false }
+                    ],
+                    2: [ // PULL
+                        { name: "Conventional Deadlift", isMainLift: true },
+                        { name: "Pull-up", isMainLift: false, reps: "max" },
+                        { name: "Barbell Row", isMainLift: false },
+                        { name: "Dumbbell Row", isMainLift: false },
+                        { name: "Face Pull", isMainLift: false },
+                        { name: "Bicep Curl", isMainLift: false }
+                    ],
+                    3: [ // LEGS
+                        { name: "Back Squat", isMainLift: true },
+                        { name: "Romanian Deadlift", isMainLift: true },
+                        { name: "Leg Press", isMainLift: false },
+                        { name: "Bulgarian Split Squat", isMainLift: false },
+                        { name: "Leg Curl", isMainLift: false },
+                        { name: "Calf Raise", isMainLift: false }
+                    ],
+                    4: [ // PUSH (repeat)
+                        { name: "Incline Bench Press", isMainLift: true },
+                        { name: "Arnold Press", isMainLift: true },
+                        { name: "Dumbbell Bench Press", isMainLift: false },
+                        { name: "Chest Fly", isMainLift: false },
+                        { name: "Front Raise", isMainLift: false },
+                        { name: "Skull Crusher", isMainLift: false }
+                    ],
+                    5: [ // PULL (repeat)
+                        { name: "Trap Bar Deadlift", isMainLift: true },
+                        { name: "Barbell Row", isMainLift: true },
+                        { name: "Lat Pulldown", isMainLift: false },
+                        { name: "Seated Cable Row", isMainLift: false },
+                        { name: "Hammer Curl", isMainLift: false },
+                        { name: "Shrug", isMainLift: false }
+                    ]
+                },
+                'upper-lower': {
+                    1: [ // UPPER A
+                        { name: "Bench Press", isMainLift: true },
+                        { name: "Barbell Row", isMainLift: true },
+                        { name: "Overhead Press", isMainLift: false },
+                        { name: "Pull-up", isMainLift: false, reps: "max" },
+                        { name: "Dip", isMainLift: false },
+                        { name: "Bicep Curl", isMainLift: false }
+                    ],
+                    2: [ // LOWER A
+                        { name: "Back Squat", isMainLift: true },
+                        { name: "Romanian Deadlift", isMainLift: true },
+                        { name: "Leg Press", isMainLift: false },
+                        { name: "Leg Curl", isMainLift: false },
+                        { name: "Calf Raise", isMainLift: false }
+                    ],
+                    3: [ // UPPER B
+                        { name: "Incline Bench Press", isMainLift: true },
+                        { name: "Seated Cable Row", isMainLift: true },
+                        { name: "Arnold Press", isMainLift: false },
+                        { name: "Lat Pulldown", isMainLift: false },
+                        { name: "Lateral Raise", isMainLift: false },
+                        { name: "Face Pull", isMainLift: false }
+                    ],
+                    4: [ // LOWER B
+                        { name: "Front Squat", isMainLift: true },
+                        { name: "Conventional Deadlift", isMainLift: true },
+                        { name: "Bulgarian Split Squat", isMainLift: false },
+                        { name: "Good Morning", isMainLift: false },
+                        { name: "Leg Extension", isMainLift: false }
+                    ],
+                    5: [ // UPPER C (for 5-day)
+                        { name: "Dumbbell Bench Press", isMainLift: true },
+                        { name: "One Arm Row", isMainLift: true },
+                        { name: "Chest Fly", isMainLift: false },
+                        { name: "Upright Row", isMainLift: false },
+                        { name: "Tricep Extension", isMainLift: false },
+                        { name: "Hammer Curl", isMainLift: false }
+                    ]
+                }
+            };
+
+            // Get exercises based on current split type
+            const getExercisesForDay = (day) => {
+                // If custom exercises exist for this day, use them; otherwise use template
+                if (customExercises[day]) {
+                    return customExercises[day];
+                }
+                return splitTemplates[splitType]?.[day] || splitTemplates['full-body'][day] || [];
+            };
+
+            const exerciseData = {}; // Build exerciseData dynamically
+            for (let i = 1; i <= 5; i++) {
+                exerciseData[i] = getExercisesForDay(i);
+            }
+
+            // Get similar exercises for swapping
+            const getSimilarExercises = (exerciseName) => {
+                const exercise = exerciseDatabase[exerciseName];
+                if (!exercise) return [];
+
+                // Special handling for squat variations - they can all swap with each other
+                const squatVariations = [
+                    "Back Squat", "Front Squat", "Zercher Squat", "Goblet Squat",
+                    "Bulgarian Split Squat", "Leg Press", "Hack Squat"
+                ];
+                
+                if (squatVariations.includes(exerciseName)) {
+                    return squatVariations
+                        .filter(name => name !== exerciseName && exerciseDatabase[name])
+                        .map(name => ({ name, ...exerciseDatabase[name] }))
+                        .sort((a, b) => {
+                            if (a.isCompound !== b.isCompound) return b.isCompound ? 1 : -1;
+                            return 0;
+                        });
+                }
+
+                // Special handling for deadlift variations - they can all swap with each other
+                const deadliftVariations = [
+                    "Conventional Deadlift", "Sumo Deadlift", "Trap Bar Deadlift", 
+                    "Romanian Deadlift", "Good Morning"
+                ];
+                
+                if (deadliftVariations.includes(exerciseName)) {
+                    return deadliftVariations
+                        .filter(name => name !== exerciseName && exerciseDatabase[name])
+                        .map(name => ({ name, ...exerciseDatabase[name] }))
+                        .sort((a, b) => {
+                            if (a.isCompound !== b.isCompound) return b.isCompound ? 1 : -1;
+                            return 0;
+                        });
+                }
+
+                // For all other exercises, match by category and type
+                return Object.entries(exerciseDatabase)
+                    .filter(([name, info]) => 
+                        name !== exerciseName && 
+                        info.category === exercise.category && 
+                        info.type === exercise.type
+                    )
+                    .map(([name, info]) => ({ name, ...info }))
+                    .sort((a, b) => {
+                        if (a.isCompound !== b.isCompound) return b.isCompound ? 1 : -1;
+                        return 0;
+                    });
+            };
+
+            const getExerciseTargets = (exercise) => {
+                const plan = trainingPlans[selectedPlan];
+                if (exercise.reps === "max") {
+                    return { sets: plan.accessorySets, reps: "max" };
+                }
+                return {
+                    sets: exercise.isMainLift ? plan.mainLiftSets : plan.accessorySets,
+                    reps: exercise.isMainLift ? plan.mainLiftReps : plan.accessoryReps
+                };
+            };
+
+            useEffect(() => {
+                loadData();
+            }, []);
+
+            const loadData = () => {
+                try {
+                    const result = storage.get('workout-data');
+                    if (result) {
+                        setWorkoutData(JSON.parse(result.value));
+                    }
+                    
+                    const monthResult = storage.get('current-month');
+                    if (monthResult) {
+                        setCurrentMonth(parseInt(monthResult.value));
+                    }
+
+                    const planResult = storage.get('selected-plan');
+                    if (planResult) {
+                        setSelectedPlan(planResult.value);
+                    }
+
+                    const workoutTypeResult = storage.get('workout-type');
+                    if (workoutTypeResult) {
+                        setWorkoutType(workoutTypeResult.value);
+                    }
+
+                    const conditioningTypeResult = storage.get('conditioning-type');
+                    if (conditioningTypeResult) {
+                        setConditioningType(conditioningTypeResult.value);
+                    }
+
+                    const daysResult = storage.get('training-days');
+                    if (daysResult) {
+                        setTrainingDays(parseInt(daysResult.value));
+                    }
+
+                    const dayTypesResult = storage.get('day-types');
+                    if (dayTypesResult) {
+                        setDayTypes(JSON.parse(dayTypesResult.value));
+                    }
+
+                    const splitTypeResult = storage.get('split-type');
+                    if (splitTypeResult) {
+                        setSplitType(splitTypeResult.value);
+                    }
+
+                    const customExResult = storage.get('custom-exercises');
+                    if (customExResult) {
+                        setCustomExercises(JSON.parse(customExResult.value));
+                    }
+                } catch (error) {
+                    console.log('No existing data, starting fresh');
+                }
+                setLoading(false);
+            };
+
+            const saveData = (data, month) => {
+                try {
+                    storage.set('workout-data', JSON.stringify(data));
+                    storage.set('current-month', month.toString());
+                } catch (error) {
+                    console.error('Error saving data:', error);
+                }
+            };
+
+            const exportProgress = () => {
+                try {
+                    const exportData = {
+                        workoutData: workoutData,
+                        currentMonth: currentMonth,
+                        selectedPlan: selectedPlan,
+                        trainingDays: trainingDays,
+                        dayTypes: dayTypes,
+                        exportDate: new Date().toISOString(),
+                        version: '1.0'
+                    };
+
+                    const dataStr = JSON.stringify(exportData, null, 2);
+                    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(dataBlob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `workout-backup-${new Date().toISOString().split('T')[0]}.json`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    
+                    alert('✅ Progress exported successfully!');
+                } catch (error) {
+                    alert('❌ Error exporting data: ' + error.message);
+                }
+            };
+
+            const importProgress = () => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'application/json';
+                
+                input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        try {
+                            const importedData = JSON.parse(event.target.result);
+                            
+                            // Validate the data
+                            if (!importedData.workoutData || !importedData.version) {
+                                throw new Error('Invalid backup file format');
+                            }
+
+                            // Restore all data
+                            setWorkoutData(importedData.workoutData);
+                            setCurrentMonth(importedData.currentMonth || 1);
+                            setSelectedPlan(importedData.selectedPlan || 'hypertrophy');
+                            setTrainingDays(importedData.trainingDays || 2);
+                            setDayTypes(importedData.dayTypes || {});
+
+                            // Save to localStorage
+                            storage.set('workout-data', JSON.stringify(importedData.workoutData));
+                            storage.set('current-month', (importedData.currentMonth || 1).toString());
+                            storage.set('selected-plan', importedData.selectedPlan || 'hypertrophy');
+                            storage.set('training-days', (importedData.trainingDays || 2).toString());
+                            storage.set('day-types', JSON.stringify(importedData.dayTypes || {}));
+
+                            alert(`✅ Progress restored successfully!\n\nBackup from: ${new Date(importedData.exportDate).toLocaleDateString()}`);
+                        } catch (error) {
+                            alert('❌ Error importing data: ' + error.message);
+                        }
+                    };
+                    
+                    reader.readAsText(file);
+                };
+                
+                input.click();
+            };
+
+            const calculate1RM = (weight, reps) => {
+                if (!weight || !reps || reps === "max") return 0;
+                return Math.round(weight * (1 + reps / 30));
+            };
+
+            const calculateStartingWeight = (oneRM, targetReps) => {
+                // Use Epley formula to calculate working weight from 1RM
+                let percentage;
+                if (targetReps >= 12) percentage = 0.67;
+                else if (targetReps >= 10) percentage = 0.70;
+                else if (targetReps >= 8) percentage = 0.75;
+                else if (targetReps >= 5) percentage = 0.85;
+                else if (targetReps >= 3) percentage = 0.90;
+                else percentage = 0.95;
+                
+                const calculatedWeight = oneRM * percentage;
+                // Round to nearest 2.5kg for proper plate loading
+                return Math.round(calculatedWeight / 2.5) * 2.5;
+            };
+
+            const setAllStartingWeights = () => {
+                const plan = trainingPlans[selectedPlan];
+                const newWorkoutData = { ...workoutData };
+                
+                // Process each day
+                for (let day = 1; day <= trainingDays; day++) {
+                    const exercises = exerciseData[day];
+                    if (!exercises) continue;
+                    
+                    exercises.forEach(exercise => {
+                        const input = startingWeights[exercise.name];
+                        if (!input || !input.weight || !input.reps) return;
+                        
+                        // Calculate 1RM from user input
+                        const oneRM = calculate1RM(parseFloat(input.weight), parseInt(input.reps));
+                        
+                        // Calculate working weight based on current plan
+                        const targetReps = exercise.isMainLift ? plan.mainLiftReps : plan.accessoryReps;
+                        const workingWeight = calculateStartingWeight(oneRM, targetReps);
+                        
+                        // Create initial workout entry
+                        const key = `${exercise.name}-${day}`;
+                        newWorkoutData[key] = [{
+                            date: new Date().toISOString(),
+                            month: currentMonth,
+                            sets: exercise.isMainLift ? plan.mainLiftSets : plan.accessorySets,
+                            reps: targetReps,
+                            weight: workingWeight,
+                            oneRM: oneRM
+                        }];
+                    });
+                }
+                
+                setWorkoutData(newWorkoutData);
+                storage.set('workout-data', JSON.stringify(newWorkoutData));
+                setShowStartingWeights(false);
+                alert('✅ Starting weights calculated and set for all exercises!');
+            };
+
+            const getRecommendedWeight = (exerciseName, month, day) => {
+                const history = workoutData[`${exerciseName}-${day}`] || [];
+                if (history.length === 0) return null;
+
+                const lastWorkout = history[history.length - 1];
+                const exercise = exerciseData[day]?.find(e => e.name === exerciseName);
+                if (!exercise) return null;
+
+                // Determine if this is a bodyweight exercise
+                const bodyweightExercises = ["Pull-up", "Chin-up", "Dip", "Push-up"];
+                const isBodyweight = bodyweightExercises.includes(exerciseName);
+
+                // For bodyweight exercises, recommend increasing reps instead of weight
+                if (isBodyweight) {
+                    const plan = trainingPlans[selectedPlan];
+                    const targetSets = exercise.isMainLift ? plan.mainLiftSets : plan.accessorySets;
+                    const targetReps = exercise.reps === "max" ? "max" : (exercise.isMainLift ? plan.mainLiftReps : plan.accessoryReps);
+                    
+                    // If they completed target sets and reps, suggest adding 1-2 reps
+                    if (lastWorkout.sets >= targetSets && lastWorkout.reps >= (targetReps === "max" ? lastWorkout.reps : targetReps)) {
+                        return {
+                            type: 'reps',
+                            value: lastWorkout.reps === "max" ? `${parseInt(lastWorkout.weight) + 1}-${parseInt(lastWorkout.weight) + 2}` : lastWorkout.reps + 1,
+                            message: `Try ${lastWorkout.reps === "max" ? 'more reps' : (lastWorkout.reps + 1) + ' reps'}`
+                        };
+                    }
+                    return {
+                        type: 'reps',
+                        value: lastWorkout.reps,
+                        message: `Aim for ${lastWorkout.reps} reps again`
+                    };
+                }
+
+                // Define progression increments by exercise type
+                // Big compound lifts: 5kg (rounded to 2.5kg)
+                // Medium exercises: 2.5kg
+                // Small/isolation exercises: 2.5kg
+                const bigLifts5kg = [
+                    "Trap Bar Deadlift", "Conventional Deadlift", "Sumo Deadlift",
+                    "Back Squat", "Front Squat", "Zercher Squat"
+                ];
+                
+                const mediumLifts5kg = [
+                    "Bench Press", "Incline Bench Press", "Decline Bench Press",
+                    "Romanian Deadlift", "Barbell Row"
+                ];
+
+                // Overhead pressing is harder to progress - use 2.5kg
+                // Kettlebell Swing gets smaller increment (2.5kg) due to explosive nature
+                const smallerIncrement = [
+                    "Overhead Press", "Military Press", "Arnold Press", "Seated Dumbbell Press",
+                    "Kettlebell Swing", "Lateral Raise", "Face Pull", "Bicep Curl", 
+                    "Tricep Extension", "Hammer Curl", "Chest Fly"
+                ];
+
+                let increment;
+                if (bigLifts5kg.includes(exerciseName)) {
+                    increment = 5; // Big lower body lifts
+                } else if (mediumLifts5kg.includes(exerciseName)) {
+                    increment = 5; // Upper body compounds
+                } else if (smallerIncrement.includes(exerciseName)) {
+                    increment = 2.5; // Smaller/isolation exercises
+                } else {
+                    increment = 2.5; // Default for all other exercises
+                }
+
+                // Get current plan targets
+                const plan = trainingPlans[selectedPlan];
+                const targetSets = exercise.isMainLift ? plan.mainLiftSets : plan.accessorySets;
+                const targetReps = exercise.isMainLift ? plan.mainLiftReps : plan.accessoryReps;
+
+                // If they hit their targets, increase weight
+                if (lastWorkout.sets >= targetSets && lastWorkout.reps >= targetReps) {
+                    const newWeight = lastWorkout.weight + increment;
+                    // CRITICAL: Always round to nearest 2.5kg to ensure proper plate loading
+                    return Math.round(newWeight * 2) / 2;
+                }
+
+                // Otherwise, keep the same weight (still round to 2.5kg)
+                return Math.round(lastWorkout.weight * 2) / 2;
+            };
+
+            const logWorkout = (exerciseName, day, sets, reps, weight) => {
+                const key = `${exerciseName}-${day}`;
+                const history = workoutData[key] || [];
+                
+                const newEntry = {
+                    date: new Date().toISOString(),
+                    month: currentMonth,
+                    sets: parseInt(sets),
+                    reps: reps === "max" ? reps : parseInt(reps),
+                    weight: parseFloat(weight),
+                    oneRM: calculate1RM(weight, reps)
+                };
+
+                const updatedData = {
+                    ...workoutData,
+                    [key]: [...history, newEntry]
+                };
+
+                setWorkoutData(updatedData);
+                saveData(updatedData, currentMonth);
+            };
+
+            const WorkoutLogger = ({ day }) => {
+                const exercises = exerciseData[day];
+                const currentPlan = trainingPlans[selectedPlan];
+                const [inputs, setInputs] = useState({});
+                const [completedExercises, setCompletedExercises] = useState({});
+                const [swappingExercise, setSwappingExercise] = useState(null);
+                
+                const workoutKey = `day-${day}-completed`;
+                const todayKey = new Date().toDateString();
+                const lastCompletedKey = `${workoutKey}-${todayKey}`;
+
+                useEffect(() => {
+                    const loadCompletion = () => {
+                        try {
+                            const result = storage.get(lastCompletedKey);
+                            if (result) {
+                                setCompletedExercises(JSON.parse(result.value));
+                            }
+                        } catch (error) {
+                            setCompletedExercises({});
+                        }
+                    };
+                    loadCompletion();
+                }, [day, lastCompletedKey]);
+
+                const handleInputChange = (exerciseName, field, value) => {
+                    setInputs(prev => ({
+                        ...prev,
+                        [exerciseName]: {
+                            ...prev[exerciseName],
+                            [field]: value
+                        }
+                    }));
+                };
+
+                const handleCompleteExercise = (exercise) => {
+                    const input = inputs[exercise.name];
+                    if (!input?.weight || !input?.reps || !input?.sets) {
+                        alert('Please enter sets, reps, and weight');
+                        return;
+                    }
+
+                    logWorkout(exercise.name, day, input.sets, input.reps, input.weight);
+                    
+                    const newCompleted = {
+                        ...completedExercises,
+                        [exercise.name]: { completed: true, data: input }
+                    };
+
+                    setCompletedExercises(newCompleted);
+                    storage.set(lastCompletedKey, JSON.stringify(newCompleted));
+                    
+                    alert(`${exercise.name} completed!`);
+                };
+
+                const handleCompleteDay = () => {
+                    const allCompleted = exercises.every(ex => completedExercises[ex.name]?.completed);
+                    
+                    if (!allCompleted) {
+                        alert('Please complete all exercises before marking the day complete');
+                        return;
+                    }
+
+                    const completionKey = `day-${day}-history`;
+                    const completionHistory = workoutData[completionKey] || [];
+                    
+                    const updatedData = {
+                        ...workoutData,
+                        [completionKey]: [...completionHistory, {
+                            date: new Date().toISOString(),
+                            month: currentMonth,
+                            plan: selectedPlan,
+                            exercises: completedExercises
+                        }]
+                    };
+
+                    setWorkoutData(updatedData);
+                    saveData(updatedData, currentMonth);
+                    
+                    storage.delete(lastCompletedKey);
+                    setCompletedExercises({});
+                    setInputs({});
+                    
+                    alert('🎉 Workout completed! Next session will have progressive weights.');
+                };
+
+                const allExercisesCompleted = exercises.every(ex => completedExercises[ex.name]?.completed);
+
+                return (
+                    <div className="space-y-4">
+                        {/* Swap Exercise Modal */}
+                        {swappingExercise && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
+                                    <div className="p-4 border-b bg-blue-500 text-white">
+                                        <h3 className="font-bold text-lg">Swap: {swappingExercise.name}</h3>
+                                        <p className="text-sm opacity-90">Choose similar exercise</p>
+                                    </div>
+                                    
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                                        {getSimilarExercises(swappingExercise.name).map((alt) => (
+                                            <button
+                                                key={alt.name}
+                                                onClick={() => {
+                                                    // Get current exercises for this day
+                                                    const currentExercises = getExercisesForDay(day);
+                                                    
+                                                    // Swap the exercise
+                                                    const updatedExercises = currentExercises.map(ex =>
+                                                        ex.name === swappingExercise.name
+                                                            ? { ...ex, name: alt.name }
+                                                            : ex
+                                                    );
+                                                    
+                                                    // Save to state and localStorage
+                                                    const newCustomExercises = { ...customExercises, [day]: updatedExercises };
+                                                    setCustomExercises(newCustomExercises);
+                                                    storage.set('custom-exercises', JSON.stringify(newCustomExercises));
+                                                    
+                                                    setSwappingExercise(null);
+                                                    alert(`✅ Swapped to ${alt.name}!`);
+                                                }}
+                                                className="w-full text-left p-3 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+                                            >
+                                                <div className="font-semibold">{alt.name}</div>
+                                                <div className="text-xs text-gray-600 mt-1 flex gap-2">
+                                                    <span className={`px-2 py-0.5 rounded ${alt.isCompound ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`}>
+                                                        {alt.isCompound ? 'Compound' : 'Isolation'}
+                                                    </span>
+                                                    <span className={`px-2 py-0.5 rounded ${
+                                                        alt.difficulty === 'beginner' ? 'bg-green-100 text-green-700' :
+                                                        alt.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-700' :
+                                                        'bg-red-100 text-red-700'
+                                                    }`}>
+                                                        {alt.difficulty}
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        ))}
+                                        
+                                        {getSimilarExercises(swappingExercise.name).length === 0 && (
+                                            <div className="text-center py-8 text-gray-500">
+                                                No similar exercises found
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="p-4 border-t">
+                                        <button
+                                            onClick={() => setSwappingExercise(null)}
+                                            className="w-full px-4 py-2 bg-gray-300 text-gray-700 rounded-lg font-semibold"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className={`bg-gradient-to-r ${currentPlan.color} text-white p-4 rounded-lg`}>
+                            <h2 className="text-2xl font-bold">Day {day} - {currentPlan.name}</h2>
+                            <p className="text-sm opacity-90">{currentPlan.description}</p>
+                            <p className="text-xs opacity-80 mt-1">
+                                Main: {currentPlan.mainLiftSets}×{currentPlan.mainLiftReps} • 
+                                Accessory: {currentPlan.accessorySets}×{currentPlan.accessoryReps} • 
+                                Rest: {currentPlan.rest}
+                            </p>
+                        </div>
+
+                        {exercises.map((exercise, idx) => {
+                            const targets = getExerciseTargets(exercise);
+                            const recommended = getRecommendedWeight(exercise.name, currentMonth, day);
+                            const history = workoutData[`${exercise.name}-${day}`] || [];
+                            const lastWorkout = history[history.length - 1];
+                            const isCompleted = completedExercises[exercise.name]?.completed;
+                            const exerciseData = completedExercises[exercise.name]?.data || {};
+
+                            return (
+                                <div key={idx} className={`border-2 rounded-lg p-4 shadow-sm transition-all ${
+                                    isCompleted ? 'bg-green-50 border-green-400' : 'bg-white border-gray-200'
+                                }`}>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-bold text-lg">{exercise.name}</h3>
+                                                {isCompleted && (
+                                                    <span className="text-green-600 font-bold">✓</span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-gray-600">
+                                                Target: {targets.sets} sets × {targets.reps} reps
+                                                {exercise.isMainLift && <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">MAIN LIFT</span>}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {!isCompleted && (
+                                                <button
+                                                    onClick={() => setSwappingExercise(exercise)}
+                                                    className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                                                    title="Swap exercise"
+                                                >
+                                                    <Repeat size={20} className="text-gray-600" />
+                                                </button>
+                                            )}
+                                            <Dumbbell className={isCompleted ? "text-green-500" : "text-gray-400"} size={24} />
+                                        </div>
+                                    </div>
+
+                                    {!isCompleted && recommended && (
+                                        <div className="bg-blue-50 border border-blue-200 rounded p-2 mb-3 text-sm">
+                                            {typeof recommended === 'object' ? (
+                                                <>
+                                                    <span className="font-semibold text-blue-700">
+                                                        📈 {recommended.message}
+                                                    </span>
+                                                    {lastWorkout && (
+                                                        <span className="text-gray-600 ml-2">
+                                                            (Last: {lastWorkout.reps} reps × {lastWorkout.sets} sets)
+                                                        </span>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="font-semibold text-blue-700">Recommended: {recommended} kg</span>
+                                                    {lastWorkout && (
+                                                        <span className="text-gray-600 ml-2">
+                                                            (Last: {lastWorkout.weight} kg × {lastWorkout.reps} × {lastWorkout.sets} sets)
+                                                        </span>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {!isCompleted ? (
+                                        <>
+                                            <div className="grid grid-cols-3 gap-2 mb-2">
+                                                <input
+                                                    type="number"
+                                                    placeholder="Sets"
+                                                    value={inputs[exercise.name]?.sets || ''}
+                                                    onChange={(e) => handleInputChange(exercise.name, 'sets', e.target.value)}
+                                                    className="border-2 border-gray-300 rounded px-3 py-2 text-center focus:border-blue-500 focus:outline-none"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    placeholder="Reps"
+                                                    value={inputs[exercise.name]?.reps || ''}
+                                                    onChange={(e) => handleInputChange(exercise.name, 'reps', e.target.value)}
+                                                    className="border-2 border-gray-300 rounded px-3 py-2 text-center focus:border-blue-500 focus:outline-none"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    placeholder="Weight (kg)"
+                                                    value={inputs[exercise.name]?.weight || ''}
+                                                    onChange={(e) => handleInputChange(exercise.name, 'weight', e.target.value)}
+                                                    className="border-2 border-gray-300 rounded px-3 py-2 text-center focus:border-blue-500 focus:outline-none"
+                                                    step="0.5"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={() => handleCompleteExercise(exercise)}
+                                                className="w-full bg-green-500 hover:bg-green-600 text-white rounded font-semibold py-2 flex items-center justify-center gap-2 transition-colors"
+                                            >
+                                                <Save size={16} />
+                                                Complete Exercise
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <div className="bg-white border border-green-300 rounded p-3">
+                                            <div className="text-sm font-semibold text-green-700">
+                                                ✓ Completed: {exerciseData.sets} sets × {exerciseData.reps} reps @ {exerciseData.weight} kg
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                Est. 1RM: {calculate1RM(exerciseData.weight, exerciseData.reps)} kg
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {lastWorkout && !isCompleted && (
+                                        <div className="mt-2 text-xs text-gray-500">
+                                            Previous: {lastWorkout.weight} kg × {lastWorkout.reps} reps × {lastWorkout.sets} sets • 
+                                            1RM: {lastWorkout.oneRM} kg
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {allExercisesCompleted && (
+                            <>
+                                <button
+                                    onClick={handleCompleteDay}
+                                    className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg font-bold py-4 text-lg flex items-center justify-center gap-2 transition-all shadow-lg"
+                                >
+                                    <span className="text-2xl">✓</span>
+                                    Complete Day {day} Workout
+                                </button>
+
+                                {/* Zone 2 Cardio Suggestion */}
+                                <div className="mt-4 bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-300 rounded-lg p-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-2xl">💡</div>
+                                        <div className="flex-1">
+                                            <h4 className="font-bold text-green-900 mb-1">Optional: Add Zone 2 Cardio</h4>
+                                            <p className="text-sm text-gray-700 mb-2">
+                                                10-20 minutes of easy cardio can help with recovery and fat loss without interfering with strength gains.
+                                            </p>
+                                            <div className="text-xs text-gray-600 bg-white rounded p-2">
+                                                <strong>Choose one:</strong> Easy walk/jog, bike, row, or incline treadmill at conversational pace (you should be able to talk easily)
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                );
+            };
+
+            const ConditioningLogger = ({workoutTypeOverride}) => {
+                const effectiveType = workoutTypeOverride || conditioningType;
+                const currentConditioning = conditioningWorkouts[effectiveType];
+                const [inputs, setInputs] = useState({});
+                const [completedExercises, setCompletedExercises] = useState({});
+                
+                const workoutKey = `conditioning-${effectiveType}-completed`;
+                const todayKey = new Date().toDateString();
+                const lastCompletedKey = `${workoutKey}-${todayKey}`;
+
+                useEffect(() => {
+                    const loadCompletion = () => {
+                        try {
+                            const result = storage.get(lastCompletedKey);
+                            if (result) {
+                                setCompletedExercises(JSON.parse(result.value));
+                            }
+                        } catch (error) {
+                            setCompletedExercises({});
+                        }
+                    };
+                    loadCompletion();
+                }, [conditioningType, lastCompletedKey]);
+
+                const handleCompleteExercise = (exercise) => {
+                    const newCompleted = {
+                        ...completedExercises,
+                        [exercise.name]: { completed: true, date: new Date().toISOString() }
+                    };
+
+                    setCompletedExercises(newCompleted);
+                    storage.set(lastCompletedKey, JSON.stringify(newCompleted));
+                    
+                    alert(`${exercise.name} completed!`);
+                };
+
+                const handleCompleteWorkout = () => {
+                    const allCompleted = currentConditioning.exercises.every(ex => completedExercises[ex.name]?.completed);
+                    
+                    if (!allCompleted) {
+                        alert('Please complete all exercises before marking the workout complete');
+                        return;
+                    }
+
+                    const completionKey = `conditioning-history`;
+                    const completionHistory = workoutData[completionKey] || [];
+                    
+                    const updatedData = {
+                        ...workoutData,
+                        [completionKey]: [...completionHistory, {
+                            date: new Date().toISOString(),
+                            type: effectiveType,
+                            exercises: completedExercises
+                        }]
+                    };
+
+                    setWorkoutData(updatedData);
+                    saveData(updatedData, currentMonth);
+                    
+                    storage.delete(lastCompletedKey);
+                    setCompletedExercises({});
+                    
+                    alert('🎉 Conditioning workout completed!');
+                };
+
+                const allExercisesCompleted = currentConditioning.exercises.every(ex => completedExercises[ex.name]?.completed);
+
+                return (
+                    <div className="space-y-4">
+                        <div className={`bg-gradient-to-r ${currentConditioning.color} text-white p-4 rounded-lg`}>
+                            <h2 className="text-2xl font-bold">{currentConditioning.name}</h2>
+                            <p className="text-sm opacity-90">{currentConditioning.description}</p>
+                        </div>
+
+                        {/* Quick Instructions */}
+                        <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+                            <div className="flex items-start gap-3">
+                                <div className="bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold flex-shrink-0">
+                                    ℹ️
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-bold text-blue-900 mb-2">How to do this workout:</h3>
+                                    <div className="text-sm text-blue-800 font-semibold mb-2">
+                                        {currentConditioning.instruction}
+                                    </div>
+                                    <div className="text-xs text-blue-700 bg-white bg-opacity-50 rounded p-2">
+                                        {currentConditioning.howTo}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {currentConditioning.exercises.map((exercise, idx) => {
+                            const isCompleted = completedExercises[exercise.name]?.completed;
+
+                            return (
+                                <div key={idx} className={`border-2 rounded-lg p-4 shadow-sm transition-all ${
+                                    isCompleted ? 'bg-green-50 border-green-400' : 'bg-white border-gray-200'
+                                }`}>
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className={`rounded-full w-8 h-8 flex items-center justify-center font-bold flex-shrink-0 ${
+                                            isCompleted ? 'bg-green-500 text-white' : 'bg-gray-700 text-white'
+                                        }`}>
+                                            {isCompleted ? '✓' : idx + 1}
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-bold text-lg">{exercise.name}</h3>
+                                            </div>
+                                            <p className="text-sm text-gray-600 mt-1">
+                                                {exercise.sets} sets × {exercise.reps}
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Rest: {exercise.rest}
+                                            </p>
+                                        </div>
+                                        <Dumbbell className={isCompleted ? "text-green-500" : "text-gray-400"} size={24} />
+                                    </div>
+
+                                    {!isCompleted ? (
+                                        <button
+                                            onClick={() => handleCompleteExercise(exercise)}
+                                            className="w-full bg-green-500 hover:bg-green-600 text-white rounded font-semibold py-2 flex items-center justify-center gap-2 transition-colors"
+                                        >
+                                            <Save size={16} />
+                                            Complete Exercise
+                                        </button>
+                                    ) : (
+                                        <div className="bg-white border border-green-300 rounded p-3">
+                                            <div className="text-sm font-semibold text-green-700">
+                                                ✓ Completed at {new Date(completedExercises[exercise.name].date).toLocaleTimeString()}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {allExercisesCompleted && (
+                            <button
+                                onClick={handleCompleteWorkout}
+                                className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg font-bold py-4 text-lg flex items-center justify-center gap-2 transition-all shadow-lg"
+                            >
+                                <span className="text-2xl">✓</span>
+                                Complete Conditioning Workout
+                            </button>
+                        )}
+                    </div>
+                );
+            };
+
+            const ProgressView = () => {
+                const allExercises = [...exerciseData[1], ...exerciseData[2]];
+                
+                return (
+                    <div className="space-y-4">
+                        <h2 className="text-2xl font-bold text-gray-800 mb-4">Progress Tracking</h2>
+                        
+                        {allExercises.map((exercise, idx) => {
+                            const day = idx < 6 ? 1 : 2;
+                            const history = workoutData[`${exercise.name}-${day}`] || [];
+                            
+                            if (history.length === 0) return null;
+
+                            const latest = history[history.length - 1];
+                            const firstWorkout = history[0];
+                            const improvement = latest.oneRM - firstWorkout.oneRM;
+
+                            return (
+                                <div key={idx} className="bg-white border-2 border-gray-200 rounded-lg p-4">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h3 className="font-bold text-lg">{exercise.name}</h3>
+                                            <p className="text-sm text-gray-600">Day {day}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-2xl font-bold text-blue-600">{latest.oneRM} kg</div>
+                                            <div className="text-xs text-gray-500">Est. 1RM</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                            <span className="text-gray-600">Latest:</span>
+                                            <span className="font-semibold ml-2">{latest.weight} kg × {latest.reps}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-gray-600">Workouts:</span>
+                                            <span className="font-semibold ml-2">{history.length}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-gray-600">First 1RM:</span>
+                                            <span className="font-semibold ml-2">{firstWorkout.oneRM} kg</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-gray-600">Improvement:</span>
+                                            <span className={`font-semibold ml-2 ${improvement > 0 ? 'text-green-600' : ''}`}>
+                                                +{improvement} kg
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3 pt-3 border-t border-gray-200">
+                                        <div className="text-xs text-gray-500 space-y-1">
+                                            {history.slice(-3).reverse().map((entry, i) => (
+                                                <div key={i} className="flex justify-between">
+                                                    <span>{new Date(entry.date).toLocaleDateString()}</span>
+                                                    <span>{entry.weight} kg × {entry.reps} • Month {entry.month}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
+            };
+
+            const ProgramOverview = () => {
+                return (
+                    <div className="space-y-4">
+                        <h2 className="text-2xl font-bold text-gray-800 mb-4">6-Month Program</h2>
+                        
+                        {Object.entries(monthPrograms).map(([month, program]) => {
+                            const isActive = parseInt(month) === currentMonth;
+                            
+                            return (
+                                <div
+                                    key={month}
+                                    className={`border-2 rounded-lg p-4 transition-all ${
+                                        isActive 
+                                            ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white border-blue-600' 
+                                            : 'bg-white border-gray-200'
+                                    }`}
+                                >
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h3 className="text-xl font-bold">Month {month}</h3>
+                                        {isActive && <span className="px-3 py-1 bg-white text-blue-600 text-sm font-bold rounded-full">ACTIVE</span>}
+                                    </div>
+                                    <div className="flex gap-4 text-sm">
+                                        <div>
+                                            <span className={isActive ? 'opacity-90' : 'text-gray-600'}>Phase:</span>
+                                            <span className="font-semibold ml-2">{program.description}</span>
+                                        </div>
+                                        <div>
+                                            <span className={isActive ? 'opacity-90' : 'text-gray-600'}>Main Lift Reps:</span>
+                                            <span className="font-semibold ml-2">{program.mainLiftReps}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    {!isActive && parseInt(month) > currentMonth && (
+                                        <button
+                                            onClick={() => {
+                                                if (confirm(`Start Month ${month}?`)) {
+                                                    setCurrentMonth(parseInt(month));
+                                                    saveData(workoutData, parseInt(month));
+                                                }
+                                            }}
+                                            className="mt-3 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm font-semibold"
+                                        >
+                                            Start This Month
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                        <div className="text-center">
+                            <Dumbbell className="animate-pulse mx-auto mb-4" size={48} />
+                            <p className="text-gray-600">Loading your training data...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gray-50 pb-20">
+                    <div className="bg-gradient-to-r from-blue-600 to-purple-700 text-white p-6 shadow-lg">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h1 className="text-3xl font-bold mb-2">Strength Training Tracker</h1>
+                                <p className="opacity-90">Complete Training System</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setShowStartingWeights(true)}
+                                    className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all"
+                                    title="Set Starting Weights"
+                                >
+                                    <Dumbbell size={20} />
+                                    <span className="hidden sm:inline">Set Weights</span>
+                                </button>
+                                <button
+                                    onClick={exportProgress}
+                                    className="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all"
+                                    title="Export Progress"
+                                >
+                                    <Download size={20} />
+                                    <span className="hidden sm:inline">Export</span>
+                                </button>
+                                <button
+                                    onClick={importProgress}
+                                    className="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all"
+                                    title="Import Progress"
+                                >
+                                    <Upload size={20} />
+                                    <span className="hidden sm:inline">Import</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Starting Weights Modal */}
+                    {showStartingWeights && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+                                <div className="p-4 border-b bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                                    <h3 className="font-bold text-xl">🎯 Set Starting Weights</h3>
+                                    <p className="text-sm opacity-90 mt-1">Enter your current max for each exercise</p>
+                                </div>
+                                
+                                <div className="flex-1 overflow-y-auto p-4">
+                                    <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-3 mb-4">
+                                        <p className="text-sm text-blue-900">
+                                            <strong>How it works:</strong> Enter the weight and reps for a recent max effort set. 
+                                            The app will calculate your 1RM and set appropriate starting weights based on your {trainingPlans[selectedPlan].name} plan.
+                                        </p>
+                                    </div>
+
+                                    {Array.from({length: trainingDays}, (_, i) => i + 1).map(day => {
+                                        const exercises = exerciseData[day];
+                                        if (!exercises) return null;
+                                        
+                                        return (
+                                            <div key={day} className="mb-6">
+                                                <h4 className="font-bold text-lg mb-3 text-gray-800">Day {day}</h4>
+                                                <div className="space-y-3">
+                                                    {exercises.map((exercise, idx) => (
+                                                        <div key={idx} className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <h5 className="font-semibold">{exercise.name}</h5>
+                                                                {exercise.isMainLift && (
+                                                                    <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">MAIN</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <div>
+                                                                    <label className="text-xs text-gray-600 block mb-1">Weight (kg)</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.5"
+                                                                        placeholder="e.g., 100"
+                                                                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg"
+                                                                        value={startingWeights[exercise.name]?.weight || ''}
+                                                                        onChange={(e) => setStartingWeights({
+                                                                            ...startingWeights,
+                                                                            [exercise.name]: {
+                                                                                ...startingWeights[exercise.name],
+                                                                                weight: e.target.value
+                                                                            }
+                                                                        })}
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-xs text-gray-600 block mb-1">Reps</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        placeholder="e.g., 8"
+                                                                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg"
+                                                                        value={startingWeights[exercise.name]?.reps || ''}
+                                                                        onChange={(e) => setStartingWeights({
+                                                                            ...startingWeights,
+                                                                            [exercise.name]: {
+                                                                                ...startingWeights[exercise.name],
+                                                                                reps: e.target.value
+                                                                            }
+                                                                        })}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            {startingWeights[exercise.name]?.weight && startingWeights[exercise.name]?.reps && (
+                                                                <div className="mt-2 text-xs text-gray-600 bg-white rounded p-2">
+                                                                    📊 Estimated 1RM: <strong>{calculate1RM(parseFloat(startingWeights[exercise.name].weight), parseInt(startingWeights[exercise.name].reps))} kg</strong>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                
+                                <div className="p-4 border-t bg-gray-50 flex gap-2">
+                                    <button
+                                        onClick={() => setShowStartingWeights(false)}
+                                        className="flex-1 px-4 py-3 bg-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-400 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={setAllStartingWeights}
+                                        className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-purple-700 transition-all"
+                                    >
+                                        Calculate & Set Weights
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Training Days Selector */}
+                    <div className="bg-white border-b-2 border-gray-200 p-4">
+                        <h3 className="text-sm font-semibold text-gray-600 mb-2">TRAINING DAYS PER WEEK:</h3>
+                        <div className="grid grid-cols-4 gap-2">
+                            {[2, 3, 4, 5].map(days => (
+                                <button
+                                    key={days}
+                                    onClick={() => {
+                                        setTrainingDays(days);
+                                        storage.set('training-days', days.toString());
+                                        if (selectedDay > days) setSelectedDay(1);
+                                    }}
+                                    className={`p-3 rounded-lg font-bold transition-all ${
+                                        trainingDays === days
+                                            ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                            : 'bg-gray-100 text-gray-700 border border-gray-300'
+                                    }`}
+                                >
+                                    {days}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Split Type Selector */}
+                        <div className="mt-4">
+                            <h4 className="text-xs font-semibold text-gray-600 mb-2">SPLIT TYPE:</h4>
+                            <div className="grid grid-cols-3 gap-2">
+                                <button
+                                    onClick={() => {
+                                        setSplitType('full-body');
+                                        storage.set('split-type', 'full-body');
+                                    }}
+                                    className={`p-2 rounded-lg text-xs font-semibold transition-all ${
+                                        splitType === 'full-body'
+                                            ? 'bg-blue-500 text-white'
+                                            : 'bg-gray-100 text-gray-700 border border-gray-300'
+                                    }`}
+                                >
+                                    💪 Full Body
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setSplitType('push-pull-legs');
+                                        storage.set('split-type', 'push-pull-legs');
+                                        if (trainingDays < 3) setTrainingDays(3);
+                                    }}
+                                    className={`p-2 rounded-lg text-xs font-semibold transition-all ${
+                                        splitType === 'push-pull-legs'
+                                            ? 'bg-blue-500 text-white'
+                                            : 'bg-gray-100 text-gray-700 border border-gray-300'
+                                    }`}
+                                >
+                                    🔥 Push/Pull/Legs
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setSplitType('upper-lower');
+                                        storage.set('split-type', 'upper-lower');
+                                    }}
+                                    className={`p-2 rounded-lg text-xs font-semibold transition-all ${
+                                        splitType === 'upper-lower'
+                                            ? 'bg-blue-500 text-white'
+                                            : 'bg-gray-100 text-gray-700 border border-gray-300'
+                                    }`}
+                                >
+                                    ⚡ Upper/Lower
+                                </button>
+                            </div>
+                            <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded p-2">
+                                {splitType === 'full-body' && '💪 Train all muscle groups each session. Great for 2-3 days/week.'}
+                                {splitType === 'push-pull-legs' && '🔥 Day 1: Push (Chest/Shoulders/Triceps), Day 2: Pull (Back/Biceps), Day 3: Legs. Best for 3-6 days/week.'}
+                                {splitType === 'upper-lower' && '⚡ Alternate upper and lower body. Day 1: Upper, Day 2: Lower, etc. Great for 4-5 days/week.'}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Plan Selector */}
+                    <div className="bg-white border-b-2 border-gray-200 p-4">
+                        <h3 className="text-sm font-semibold text-gray-600 mb-2">SELECT TRAINING PLAN:</h3>
+                        <div className="grid grid-cols-2 gap-2">
+                            {Object.entries(trainingPlans).map(([key, plan]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => {
+                                        setSelectedPlan(key);
+                                        storage.set('selected-plan', key);
+                                    }}
+                                    className={`p-3 rounded-lg font-semibold text-sm transition-all ${
+                                        selectedPlan === key
+                                            ? `bg-gradient-to-r ${plan.color} text-white shadow-md`
+                                            : 'bg-gray-100 text-gray-700 border border-gray-300'
+                                    }`}
+                                >
+                                    <div>{plan.name}</div>
+                                    <div className="text-xs opacity-80">{plan.mainLiftSets}×{plan.mainLiftReps}</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Workout Type Toggle */}
+                    <div className="bg-white border-b-2 border-gray-200 p-4">
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    setWorkoutType('strength');
+                                    storage.set('workout-type', 'strength');
+                                }}
+                                className={`flex-1 py-3 rounded-lg font-semibold transition-all ${
+                                    workoutType === 'strength'
+                                        ? 'bg-blue-500 text-white shadow-md'
+                                        : 'bg-gray-100 text-gray-700'
+                                }`}
+                            >
+                                💪 Strength
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setWorkoutType('conditioning');
+                                    storage.set('workout-type', 'conditioning');
+                                }}
+                                className={`flex-1 py-3 rounded-lg font-semibold transition-all ${
+                                    workoutType === 'conditioning'
+                                        ? 'bg-blue-500 text-white shadow-md'
+                                        : 'bg-gray-100 text-gray-700'
+                                }`}
+                            >
+                                🔥 Conditioning
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Conditioning Type Selector (shown when conditioning is selected) */}
+                    {workoutType === 'conditioning' && (
+                        <div className="bg-white border-b-2 border-gray-200 p-4">
+                            <h3 className="text-sm font-semibold text-gray-600 mb-2">SELECT CONDITIONING TYPE:</h3>
+                            <div className="grid grid-cols-2 gap-2">
+                                {Object.entries(conditioningWorkouts).map(([key, workout]) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => {
+                                            setConditioningType(key);
+                                            storage.set('conditioning-type', key);
+                                        }}
+                                        className={`p-3 rounded-lg font-semibold text-sm transition-all ${
+                                            conditioningType === key
+                                                ? `bg-gradient-to-r ${workout.color} text-white shadow-md`
+                                                : 'bg-gray-100 text-gray-700 border border-gray-300'
+                                        }`}
+                                    >
+                                        <div>{workout.name}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="bg-white border-b-2 border-gray-200 sticky top-0 z-10 shadow-sm">
+                        <div className="flex">
+                            <button
+                                onClick={() => setActiveTab('workout')}
+                                className={`flex-1 py-4 px-4 font-semibold flex items-center justify-center gap-2 transition-colors ${
+                                    activeTab === 'workout' 
+                                        ? 'bg-blue-500 text-white' 
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                            >
+                                <Dumbbell size={20} />
+                                Workout
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('progress')}
+                                className={`flex-1 py-4 px-4 font-semibold flex items-center justify-center gap-2 transition-colors ${
+                                    activeTab === 'progress' 
+                                        ? 'bg-blue-500 text-white' 
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                            >
+                                <TrendingUp size={20} />
+                                Progress
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('program')}
+                                className={`flex-1 py-4 px-4 font-semibold flex items-center justify-center gap-2 transition-colors ${
+                                    activeTab === 'program' 
+                                        ? 'bg-blue-500 text-white' 
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                            >
+                                <Calendar size={20} />
+                                Program
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="p-4">
+                        {activeTab === 'workout' && (
+                            <>
+                                {workoutType === 'strength' ? (
+                                    <>
+                                        {/* Day selector buttons */}
+                                        <div className="flex gap-2 mb-4 flex-wrap">
+                                            {Array.from({length: trainingDays}, (_, i) => i + 1).map(day => (
+                                                <button
+                                                    key={day}
+                                                    onClick={() => setSelectedDay(day)}
+                                                    className={`flex-1 min-w-[80px] py-3 px-4 rounded-lg font-semibold transition-colors ${
+                                                        selectedDay === day
+                                                            ? 'bg-blue-500 text-white shadow-md'
+                                                            : 'bg-white text-gray-700 border-2 border-gray-200'
+                                                    }`}
+                                                >
+                                                    Day {day}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Day Type Selector */}
+                                        <div className="mb-4 bg-gray-50 border-2 border-gray-200 rounded-lg p-3">
+                                            <div className="text-xs font-semibold text-gray-600 mb-2">DAY {selectedDay} TYPE:</div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        const newTypes = {...dayTypes, [selectedDay]: 'strength'};
+                                                        setDayTypes(newTypes);
+                                                        storage.set('day-types', JSON.stringify(newTypes));
+                                                    }}
+                                                    className={`px-3 py-2 rounded text-xs font-semibold transition-all ${
+                                                        (dayTypes[selectedDay] || 'strength') === 'strength'
+                                                            ? 'bg-blue-500 text-white'
+                                                            : 'bg-white text-gray-700 border border-gray-300'
+                                                    }`}
+                                                >
+                                                    💪 Strength
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const newTypes = {...dayTypes, [selectedDay]: 'circuit'};
+                                                        setDayTypes(newTypes);
+                                                        storage.set('day-types', JSON.stringify(newTypes));
+                                                    }}
+                                                    className={`px-3 py-2 rounded text-xs font-semibold transition-all ${
+                                                        dayTypes[selectedDay] === 'circuit'
+                                                            ? 'bg-cyan-500 text-white'
+                                                            : 'bg-white text-gray-700 border border-gray-300'
+                                                    }`}
+                                                >
+                                                    🔄 Circuit
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const newTypes = {...dayTypes, [selectedDay]: 'mma'};
+                                                        setDayTypes(newTypes);
+                                                        storage.set('day-types', JSON.stringify(newTypes));
+                                                    }}
+                                                    className={`px-3 py-2 rounded text-xs font-semibold transition-all ${
+                                                        dayTypes[selectedDay] === 'mma'
+                                                            ? 'bg-red-600 text-white'
+                                                            : 'bg-white text-gray-700 border border-gray-300'
+                                                    }`}
+                                                >
+                                                    🥊 MMA
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const newTypes = {...dayTypes, [selectedDay]: 'boxing'};
+                                                        setDayTypes(newTypes);
+                                                        storage.set('day-types', JSON.stringify(newTypes));
+                                                    }}
+                                                    className={`px-3 py-2 rounded text-xs font-semibold transition-all ${
+                                                        dayTypes[selectedDay] === 'boxing'
+                                                            ? 'bg-yellow-600 text-white'
+                                                            : 'bg-white text-gray-700 border border-gray-300'
+                                                    }`}
+                                                >
+                                                    🥊 Boxing Bag
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Show workout based on day type */}
+                                        {(dayTypes[selectedDay] || 'strength') === 'strength' && (
+                                            <WorkoutLogger day={selectedDay} />
+                                        )}
+                                        {dayTypes[selectedDay] === 'circuit' && (
+                                            <ConditioningLogger workoutTypeOverride="circuit" />
+                                        )}
+                                        {dayTypes[selectedDay] === 'mma' && (
+                                            <ConditioningLogger workoutTypeOverride="mma" />
+                                        )}
+                                        {dayTypes[selectedDay] === 'boxing' && (
+                                            <ConditioningLogger workoutTypeOverride="boxing" />
+                                        )}
+                                    </>
+                                ) : (
+                                    <ConditioningLogger />
+                                )}
+                            </>
+                        )}
+
+                        {activeTab === 'progress' && <ProgressView />}
+                        {activeTab === 'program' && <ProgramOverview />}
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<StrengthTrainingApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
