@@ -3,11 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Complete strength training and conditioning tracker with progressive overload">
+    <meta name="theme-color" content="#2563eb">
     <title>Strength Training Tracker</title>
+    
+    <!-- PWA Support -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Strength">
+    
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Register Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(reg => console.log('Service Worker registered'))
+                    .catch(err => console.log('Service Worker registration failed'));
+            });
+        }
+    </script>
+    
     <style>
         body {
             margin: 0;
@@ -123,6 +145,14 @@
             const [dayTypes, setDayTypes] = useState({});
             const [splitType, setSplitType] = useState('full-body'); // 'full-body', 'push-pull-legs', 'upper-lower'
             const [customExercises, setCustomExercises] = useState({}); // Store custom/swapped exercises per day
+            const [showExerciseBrowser, setShowExerciseBrowser] = useState(false);
+            const [selectedDayForBrowse, setSelectedDayForBrowse] = useState(null);
+            const [userAddedExercises, setUserAddedExercises] = useState([]);
+            const [showAddCustomExercise, setShowAddCustomExercise] = useState(false);
+            const [showExerciseSettings, setShowExerciseSettings] = useState(null);
+            const [customPlans, setCustomPlans] = useState({});
+            const [showCreatePlan, setShowCreatePlan] = useState(false);
+            const [exerciseBrowserFilter, setExerciseBrowserFilter] = useState('all');
             const [showStartingWeights, setShowStartingWeights] = useState(false);
             const [startingWeights, setStartingWeights] = useState({});
 
@@ -577,6 +607,16 @@
                     if (customExResult) {
                         setCustomExercises(JSON.parse(customExResult.value));
                     }
+
+                    const userExercisesResult = storage.get('user-exercises');
+                    if (userExercisesResult) {
+                        setUserAddedExercises(JSON.parse(userExercisesResult.value));
+                    }
+
+                    const customPlansResult = storage.get('custom-plans');
+                    if (customPlansResult) {
+                        setCustomPlans(JSON.parse(customPlansResult.value));
+                    }
                 } catch (error) {
                     console.log('No existing data, starting fresh');
                 }
@@ -600,8 +640,12 @@
                         selectedPlan: selectedPlan,
                         trainingDays: trainingDays,
                         dayTypes: dayTypes,
+                        customExercises: customExercises,
+                        userAddedExercises: userAddedExercises,
+                        customPlans: customPlans,
+                        splitType: splitType,
                         exportDate: new Date().toISOString(),
-                        version: '1.0'
+                        version: '2.0'
                     };
 
                     const dataStr = JSON.stringify(exportData, null, 2);
@@ -619,6 +663,104 @@
                 } catch (error) {
                     alert('❌ Error exporting data: ' + error.message);
                 }
+            };
+
+            // NEW FUNCTIONS FOR FEATURES
+
+            // Get all available exercises (database + user added)
+            const getAllExercises = () => {
+                const dbExercises = Object.entries(exerciseDatabase).map(([name, info]) => ({
+                    name,
+                    ...info
+                }));
+                return [...dbExercises, ...userAddedExercises];
+            };
+
+            // Filter exercises for browser
+            const getFilteredExercises = () => {
+                const all = getAllExercises();
+                if (exerciseBrowserFilter === 'all') return all;
+                if (exerciseBrowserFilter === 'lower') return all.filter(ex => ex.category === 'lower');
+                if (exerciseBrowserFilter === 'upper') return all.filter(ex => ex.category === 'upper');
+                if (exerciseBrowserFilter === 'compound') return all.filter(ex => ex.isCompound);
+                if (exerciseBrowserFilter === 'isolation') return all.filter(ex => !ex.isCompound);
+                return all;
+            };
+
+            // Add exercise to day
+            const addExerciseToDay = (day, exerciseName, isMainLift = false) => {
+                const currentExercises = getExercisesForDay(day);
+                const newExercise = {
+                    name: exerciseName,
+                    isMainLift: isMainLift,
+                    technique: 'normal',
+                    customSets: null,
+                    customReps: null
+                };
+                const updated = [...currentExercises, newExercise];
+                const newCustom = { ...customExercises, [day]: updated };
+                setCustomExercises(newCustom);
+                storage.set('custom-exercises', JSON.stringify(newCustom));
+                setShowExerciseBrowser(false);
+                alert(`✅ ${exerciseName} added to Day ${day}!`);
+            };
+
+            // Remove exercise from day
+            const removeExerciseFromDay = (day, exerciseIndex) => {
+                if (!confirm('Remove this exercise?')) return;
+                const currentExercises = getExercisesForDay(day);
+                const updated = currentExercises.filter((_, idx) => idx !== exerciseIndex);
+                const newCustom = { ...customExercises, [day]: updated };
+                setCustomExercises(newCustom);
+                storage.set('custom-exercises', JSON.stringify(newCustom));
+            };
+
+            // Create custom exercise
+            const createCustomExercise = (exerciseData) => {
+                const updated = [...userAddedExercises, exerciseData];
+                setUserAddedExercises(updated);
+                storage.set('user-exercises', JSON.stringify(updated));
+                setShowAddCustomExercise(false);
+                alert(`✅ ${exerciseData.name} created!`);
+            };
+
+            // Update exercise settings
+            const updateExerciseSettings = (day, exerciseIndex, settings) => {
+                const exercises = [...getExercisesForDay(day)];
+                exercises[exerciseIndex] = { ...exercises[exerciseIndex], ...settings };
+                const newCustom = { ...customExercises, [day]: exercises };
+                setCustomExercises(newCustom);
+                storage.set('custom-exercises', JSON.stringify(newCustom));
+                setShowExerciseSettings(null);
+                alert('✅ Exercise settings updated!');
+            };
+
+            // Create custom training plan
+            const createCustomPlan = (planData) => {
+                const planId = planData.name.toLowerCase().replace(/\s+/g, '-');
+                const newPlans = { ...customPlans, [planId]: planData };
+                setCustomPlans(newPlans);
+                storage.set('custom-plans', JSON.stringify(newPlans));
+                setShowCreatePlan(false);
+                alert(`✅ ${planData.name} plan created!`);
+            };
+
+            // Get exercise targets (updated to handle custom sets/reps)
+            const getExerciseTargetsEnhanced = (exercise) => {
+                // If exercise has custom sets/reps, use those
+                if (exercise.customSets && exercise.customReps) {
+                    return { sets: exercise.customSets, reps: exercise.customReps };
+                }
+                
+                // Otherwise use plan defaults or exercise-specific
+                const plan = customPlans[selectedPlan] || trainingPlans[selectedPlan];
+                if (exercise.reps === "max") {
+                    return { sets: plan.accessorySets, reps: "max" };
+                }
+                return {
+                    sets: exercise.isMainLift ? plan.mainLiftSets : plan.accessorySets,
+                    reps: exercise.isMainLift ? plan.mainLiftReps : plan.accessoryReps
+                };
             };
 
             const importProgress = () => {
@@ -646,6 +788,10 @@
                             setSelectedPlan(importedData.selectedPlan || 'hypertrophy');
                             setTrainingDays(importedData.trainingDays || 2);
                             setDayTypes(importedData.dayTypes || {});
+                            setCustomExercises(importedData.customExercises || {});
+                            setUserAddedExercises(importedData.userAddedExercises || []);
+                            setCustomPlans(importedData.customPlans || {});
+                            setSplitType(importedData.splitType || 'full-body');
 
                             // Save to localStorage
                             storage.set('workout-data', JSON.stringify(importedData.workoutData));
@@ -653,6 +799,10 @@
                             storage.set('selected-plan', importedData.selectedPlan || 'hypertrophy');
                             storage.set('training-days', (importedData.trainingDays || 2).toString());
                             storage.set('day-types', JSON.stringify(importedData.dayTypes || {}));
+                            storage.set('custom-exercises', JSON.stringify(importedData.customExercises || {}));
+                            storage.set('user-exercises', JSON.stringify(importedData.userAddedExercises || []));
+                            storage.set('custom-plans', JSON.stringify(importedData.customPlans || {}));
+                            storage.set('split-type', importedData.splitType || 'full-body');
 
                             alert(`✅ Progress restored successfully!\n\nBackup from: ${new Date(importedData.exportDate).toLocaleDateString()}`);
                         } catch (error) {
@@ -999,7 +1149,7 @@
                         </div>
 
                         {exercises.map((exercise, idx) => {
-                            const targets = getExerciseTargets(exercise);
+                            const targets = getExerciseTargetsEnhanced(exercise);
                             const recommended = getRecommendedWeight(exercise.name, currentMonth, day);
                             const history = workoutData[`${exercise.name}-${day}`] || [];
                             const lastWorkout = history[history.length - 1];
@@ -1012,10 +1162,19 @@
                                 }`}>
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex-1">
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 flex-wrap">
                                                 <h3 className="font-bold text-lg">{exercise.name}</h3>
                                                 {isCompleted && (
                                                     <span className="text-green-600 font-bold">✓</span>
+                                                )}
+                                                {exercise.technique === 'rest-pause' && (
+                                                    <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-bold">🔴 RP</span>
+                                                )}
+                                                {exercise.technique === 'drop-set' && (
+                                                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full font-bold">🔽 DS</span>
+                                                )}
+                                                {exercise.customSets && (
+                                                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-bold">⚙️</span>
                                                 )}
                                             </div>
                                             <p className="text-sm text-gray-600">
@@ -1025,13 +1184,29 @@
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {!isCompleted && (
-                                                <button
-                                                    onClick={() => setSwappingExercise(exercise)}
-                                                    className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                                                    title="Swap exercise"
-                                                >
-                                                    <Repeat size={20} className="text-gray-600" />
-                                                </button>
+                                                <>
+                                                    <button
+                                                        onClick={() => setShowExerciseSettings({day, exerciseIndex: idx})}
+                                                        className="p-2 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
+                                                        title="Exercise Settings"
+                                                    >
+                                                        <span className="text-lg">⚙️</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setSwappingExercise(exercise)}
+                                                        className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                                                        title="Swap exercise"
+                                                    >
+                                                        <Repeat size={20} className="text-gray-600" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => removeExerciseFromDay(day, idx)}
+                                                        className="p-2 bg-red-100 hover:bg-red-200 rounded-lg transition-colors"
+                                                        title="Remove exercise"
+                                                    >
+                                                        <span className="text-red-600 font-bold">×</span>
+                                                    </button>
+                                                </>
                                             )}
                                             <Dumbbell className={isCompleted ? "text-green-500" : "text-gray-400"} size={24} />
                                         </div>
@@ -1117,6 +1292,18 @@
                                 </div>
                             );
                         })}
+
+                        {/* Add Exercise Button */}
+                        <button
+                            onClick={() => {
+                                setSelectedDayForBrowse(day);
+                                setShowExerciseBrowser(true);
+                            }}
+                            className="w-full p-4 border-2 border-dashed border-blue-500 rounded-lg text-blue-600 font-semibold hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
+                        >
+                            <span className="text-2xl">+</span>
+                            Add Exercise
+                        </button>
 
                         {allExercisesCompleted && (
                             <>
@@ -1433,6 +1620,295 @@
 
             return (
                 <div className="min-h-screen bg-gray-50 pb-20">
+                    {/* EXERCISE BROWSER MODAL */}
+                    {showExerciseBrowser && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
+                                <div className="p-4 border-b bg-gradient-to-r from-blue-500 to-purple-600 text-white flex justify-between items-center">
+                                    <div>
+                                        <h3 className="font-bold text-xl">Add Exercise to Day {selectedDayForBrowse}</h3>
+                                        <p className="text-sm opacity-90">Click any exercise to add it</p>
+                                    </div>
+                                    <button onClick={() => setShowExerciseBrowser(false)} className="text-2xl">&times;</button>
+                                    </div>
+                                
+                                {/* Filter Tabs */}
+                                <div className="flex gap-2 p-3 border-b overflow-x-auto">
+                                    {['all', 'lower', 'upper', 'compound', 'isolation'].map(filter => (
+                                        <button
+                                            key={filter}
+                                            onClick={() => setExerciseBrowserFilter(filter)}
+                                            className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-all ${
+                                                exerciseBrowserFilter === filter
+                                                    ? 'bg-blue-500 text-white'
+                                                    : 'bg-gray-100 text-gray-700'
+                                            }`}
+                                        >
+                                            {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                {/* Exercise List */}
+                                <div className="flex-1 overflow-y-auto p-4">
+                                    {getFilteredExercises().map((exercise, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => addExerciseToDay(selectedDayForBrowse, exercise.name, false)}
+                                            className="w-full text-left p-3 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all mb-2"
+                                        >
+                                            <div className="font-semibold text-lg">{exercise.name}</div>
+                                            <div className="flex gap-2 mt-1">
+                                                <span className={`text-xs px-2 py-0.5 rounded ${exercise.isCompound ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`}>
+                                                    {exercise.isCompound ? 'Compound' : 'Isolation'}
+                                                </span>
+                                                <span className={`text-xs px-2 py-0.5 rounded ${
+                                                    exercise.difficulty === 'beginner' ? 'bg-green-100 text-green-700' :
+                                                    exercise.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-700' :
+                                                    'bg-red-100 text-red-700'
+                                                }`}>
+                                                    {exercise.difficulty}
+                                                </span>
+                                                <span className="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-700">
+                                                    {exercise.category} • {exercise.type}
+                                                </span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                {/* Footer */}
+                                <div className="p-4 border-t bg-gray-50">
+                                    <button
+                                        onClick={() => setShowAddCustomExercise(true)}
+                                        className="w-full px-4 py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors"
+                                    >
+                                        + Create Custom Exercise
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* CUSTOM EXERCISE CREATOR MODAL */}
+                    {showAddCustomExercise && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-lg max-w-md w-full">
+                                <div className="p-4 border-b bg-gradient-to-r from-green-500 to-emerald-600 text-white">
+                                    <h3 className="font-bold text-xl">Create Custom Exercise</h3>
+                                </div>
+                                
+                                <div className="p-4">
+                                    <form onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const formData = new FormData(e.target);
+                                        createCustomExercise({
+                                            name: formData.get('name'),
+                                            category: formData.get('category'),
+                                            type: formData.get('type'),
+                                            isCompound: formData.get('isCompound') === 'true',
+                                            difficulty: formData.get('difficulty')
+                                        });
+                                    }}>
+                                        <div className="mb-3">
+                                            <label className="block text-sm font-semibold mb-1">Exercise Name *</label>
+                                            <input name="name" type="text" required className="w-full p-2 border-2 border-gray-300 rounded-lg" placeholder="e.g., Band Pull-Aparts" />
+                                        </div>
+                                        
+                                        <div className="mb-3">
+                                            <label className="block text-sm font-semibold mb-1">Category *</label>
+                                            <select name="category" required className="w-full p-2 border-2 border-gray-300 rounded-lg">
+                                                <option value="lower">Lower Body</option>
+                                                <option value="upper">Upper Body</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div className="mb-3">
+                                            <label className="block text-sm font-semibold mb-1">Type *</label>
+                                            <select name="type" required className="w-full p-2 border-2 border-gray-300 rounded-lg">
+                                                <option value="quad">Quad</option>
+                                                <option value="hip">Hip/Glute</option>
+                                                <option value="push-h">Horizontal Push</option>
+                                                <option value="push-v">Vertical Push</option>
+                                                <option value="pull-h">Horizontal Pull</option>
+                                                <option value="pull-v">Vertical Pull</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div className="mb-3">
+                                            <label className="block text-sm font-semibold mb-1">Compound or Isolation *</label>
+                                            <select name="isCompound" required className="w-full p-2 border-2 border-gray-300 rounded-lg">
+                                                <option value="true">Compound</option>
+                                                <option value="false">Isolation</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-semibold mb-1">Difficulty *</label>
+                                            <select name="difficulty" required className="w-full p-2 border-2 border-gray-300 rounded-lg">
+                                                <option value="beginner">Beginner</option>
+                                                <option value="intermediate">Intermediate</option>
+                                                <option value="advanced">Advanced</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div className="flex gap-2">
+                                            <button type="button" onClick={() => setShowAddCustomExercise(false)} className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg font-semibold">
+                                                Cancel
+                                            </button>
+                                            <button type="submit" className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg font-semibold">
+                                                Create Exercise
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* EXERCISE SETTINGS MODAL */}
+                    {showExerciseSettings && (() => {
+                        const exercises = getExercisesForDay(showExerciseSettings.day);
+                        const exercise = exercises[showExerciseSettings.exerciseIndex];
+                        return (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                                <div className="bg-white rounded-lg max-w-md w-full">
+                                    <div className="p-4 border-b bg-gradient-to-r from-purple-500 to-pink-600 text-white">
+                                        <h3 className="font-bold text-xl">Exercise Settings</h3>
+                                        <p className="text-sm opacity-90">{exercise.name}</p>
+                                    </div>
+                                    
+                                    <div className="p-4">
+                                        <form onSubmit={(e) => {
+                                            e.preventDefault();
+                                            const formData = new FormData(e.target);
+                                            const useCustom = formData.get('useCustom') === 'on';
+                                            updateExerciseSettings(showExerciseSettings.day, showExerciseSettings.exerciseIndex, {
+                                                technique: formData.get('technique'),
+                                                customSets: useCustom ? parseInt(formData.get('sets')) : null,
+                                                customReps: useCustom ? parseInt(formData.get('reps')) : null
+                                            });
+                                        }}>
+                                            <div className="mb-4">
+                                                <label className="block text-sm font-semibold mb-2">Training Technique</label>
+                                                <select name="technique" defaultValue={exercise.technique || 'normal'} className="w-full p-2 border-2 border-gray-300 rounded-lg">
+                                                    <option value="normal">Normal</option>
+                                                    <option value="rest-pause">🔴 Rest-Pause (rest 15-20s, continue)</option>
+                                                    <option value="drop-set">🔽 Drop Set (reduce weight, continue)</option>
+                                                </select>
+                                            </div>
+                                            
+                                            <div className="mb-4">
+                                                <label className="flex items-center gap-2 mb-2">
+                                                    <input type="checkbox" name="useCustom" defaultChecked={exercise.customSets} className="w-4 h-4" />
+                                                    <span className="font-semibold">Custom Sets & Reps</span>
+                                                </label>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-xs mb-1">Sets</label>
+                                                        <input name="sets" type="number" min="1" max="10" defaultValue={exercise.customSets || 3} className="w-full p-2 border-2 border-gray-300 rounded-lg" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs mb-1">Reps</label>
+                                                        <input name="reps" type="number" min="1" max="30" defaultValue={exercise.customReps || 10} className="w-full p-2 border-2 border-gray-300 rounded-lg" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="flex gap-2">
+                                                <button type="button" onClick={() => setShowExerciseSettings(null)} className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg font-semibold">
+                                                    Cancel
+                                                </button>
+                                                <button type="submit" className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg font-semibold">
+                                                    Save Settings
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
+
+                    {/* CUSTOM PLAN CREATOR MODAL */}
+                    {showCreatePlan && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-lg max-w-md w-full">
+                                <div className="p-4 border-b bg-gradient-to-r from-orange-500 to-red-600 text-white">
+                                    <h3 className="font-bold text-xl">Create Custom Training Plan</h3>
+                                </div>
+                                
+                                <div className="p-4">
+                                    <form onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const formData = new FormData(e.target);
+                                        createCustomPlan({
+                                            name: formData.get('name'),
+                                            mainLiftSets: parseInt(formData.get('mainSets')),
+                                            mainLiftReps: parseInt(formData.get('mainReps')),
+                                            accessorySets: parseInt(formData.get('accessorySets')),
+                                            accessoryReps: parseInt(formData.get('accessoryReps')),
+                                            color: formData.get('color')
+                                        });
+                                    }}>
+                                        <div className="mb-3">
+                                            <label className="block text-sm font-semibold mb-1">Plan Name *</label>
+                                            <input name="name" type="text" required className="w-full p-2 border-2 border-gray-300 rounded-lg" placeholder="e.g., My 5x5 Power Plan" />
+                                        </div>
+                                        
+                                        <div className="mb-3">
+                                            <label className="block text-sm font-semibold mb-2">Main Lifts (Compound exercises)</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="block text-xs mb-1">Sets</label>
+                                                    <input name="mainSets" type="number" min="1" max="10" defaultValue="5" required className="w-full p-2 border-2 border-gray-300 rounded-lg" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs mb-1">Reps</label>
+                                                    <input name="mainReps" type="number" min="1" max="30" defaultValue="5" required className="w-full p-2 border-2 border-gray-300 rounded-lg" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="mb-3">
+                                            <label className="block text-sm font-semibold mb-2">Accessory Exercises</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="block text-xs mb-1">Sets</label>
+                                                    <input name="accessorySets" type="number" min="1" max="10" defaultValue="3" required className="w-full p-2 border-2 border-gray-300 rounded-lg" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs mb-1">Reps</label>
+                                                    <input name="accessoryReps" type="number" min="1" max="30" defaultValue="10" required className="w-full p-2 border-2 border-gray-300 rounded-lg" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-semibold mb-1">Color Theme</label>
+                                            <select name="color" required className="w-full p-2 border-2 border-gray-300 rounded-lg">
+                                                <option value="from-red-500 to-orange-600">Red</option>
+                                                <option value="from-blue-500 to-cyan-600">Blue</option>
+                                                <option value="from-green-500 to-emerald-600">Green</option>
+                                                <option value="from-purple-500 to-pink-600">Purple</option>
+                                                <option value="from-yellow-500 to-orange-600">Yellow</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div className="flex gap-2">
+                                            <button type="button" onClick={() => setShowCreatePlan(false)} className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg font-semibold">
+                                                Cancel
+                                            </button>
+                                            <button type="submit" className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold">
+                                                Create Plan
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="bg-gradient-to-r from-blue-600 to-purple-700 text-white p-6 shadow-lg">
                         <div className="flex items-center justify-between">
                             <div>
@@ -1664,6 +2140,31 @@
                                     <div className="text-xs opacity-80">{plan.mainLiftSets}×{plan.mainLiftReps}</div>
                                 </button>
                             ))}
+                            {/* Custom Plans */}
+                            {Object.entries(customPlans).map(([key, plan]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => {
+                                        setSelectedPlan(key);
+                                        storage.set('selected-plan', key);
+                                    }}
+                                    className={`p-3 rounded-lg font-semibold text-sm transition-all ${
+                                        selectedPlan === key
+                                            ? `bg-gradient-to-r ${plan.color} text-white shadow-md`
+                                            : 'bg-gray-100 text-gray-700 border border-gray-300'
+                                    }`}
+                                >
+                                    <div>{plan.name} ⭐</div>
+                                    <div className="text-xs opacity-80">{plan.mainLiftSets}×{plan.mainLiftReps}</div>
+                                </button>
+                            ))}
+                            {/* Create Custom Plan Button */}
+                            <button
+                                onClick={() => setShowCreatePlan(true)}
+                                className="p-3 rounded-lg font-semibold text-sm bg-orange-100 text-orange-700 border-2 border-orange-300 hover:bg-orange-200 transition-all"
+                            >
+                                + Create Custom
+                            </button>
                         </div>
                     </div>
 
@@ -1773,20 +2274,44 @@
                                                 <button
                                                     key={day}
                                                     onClick={() => setSelectedDay(day)}
-                                                    className={`flex-1 min-w-[80px] py-3 px-4 rounded-lg font-semibold transition-colors ${
+                                                    className={`flex-1 min-w-[80px] py-3 px-4 rounded-lg font-semibold transition-colors relative ${
                                                         selectedDay === day
                                                             ? 'bg-blue-500 text-white shadow-md'
                                                             : 'bg-white text-gray-700 border-2 border-gray-200'
                                                     }`}
                                                 >
                                                     Day {day}
+                                                    {customExercises[day] && (
+                                                        <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                                                            ✓
+                                                        </span>
+                                                    )}
                                                 </button>
                                             ))}
                                         </div>
 
                                         {/* Day Type Selector */}
                                         <div className="mb-4 bg-gray-50 border-2 border-gray-200 rounded-lg p-3">
-                                            <div className="text-xs font-semibold text-gray-600 mb-2">DAY {selectedDay} TYPE:</div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="text-xs font-semibold text-gray-600">DAY {selectedDay} TYPE:</div>
+                                                {customExercises[selectedDay] && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (confirm(`Reset Day ${selectedDay} to default exercises?`)) {
+                                                                const newCustom = { ...customExercises };
+                                                                delete newCustom[selectedDay];
+                                                                setCustomExercises(newCustom);
+                                                                storage.set('custom-exercises', JSON.stringify(newCustom));
+                                                                alert('✅ Day reset to default exercises!');
+                                                            }
+                                                        }}
+                                                        className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold hover:bg-red-200 transition-colors"
+                                                        title="Reset to default exercises"
+                                                    >
+                                                        ↺ Reset Day
+                                                    </button>
+                                                )}
+                                            </div>
                                             <div className="grid grid-cols-2 gap-2">
                                                 <button
                                                     onClick={() => {
