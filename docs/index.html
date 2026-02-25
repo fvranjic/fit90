@@ -2446,14 +2446,20 @@
                                     </div>
 
                                     {Array.from({length: trainingDays}, (_, i) => i + 1).map(day => {
-                                        const exercises = exerciseData[day];
-                                        if (!exercises || exercises.length === 0) return null;
-                                        
-                                        return (
-                                            <div key={day} className="mb-6">
-                                                <h4 className="font-bold text-lg mb-3 text-gray-800">Day {day}</h4>
-                                                <div className="space-y-3">
-                                                    {exercises.filter(ex => ex && ex.name).map((exercise, idx) => (
+                                        try {
+                                            const exercises = exerciseData[day];
+                                            if (!exercises || !Array.isArray(exercises) || exercises.length === 0) return null;
+                                            
+                                            const validExercises = exercises.filter(ex => ex && ex.name && typeof ex.name === 'string');
+                                            if (validExercises.length === 0) return null;
+                                            
+                                            return (
+                                                <div key={day} className="mb-6">
+                                                    <h4 className="font-bold text-lg mb-3 text-gray-800">Day {day}</h4>
+                                                    <div className="space-y-3">
+                                                        {validExercises.map((exercise, idx) => {
+                                                            try {
+                                                                return (
                                                         <div key={idx} className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3">
                                                             <div className="flex items-center gap-2 mb-2">
                                                                 <h5 className="font-semibold">{exercise.name}</h5>
@@ -2502,10 +2508,19 @@
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    ))}
+                                                    );
+                                                } catch (exerciseError) {
+                                                    console.error('Error rendering exercise in Set Weights:', exerciseError, exercise);
+                                                    return null;
+                                                }
+                                            })}
                                                 </div>
                                             </div>
                                         );
+                                        } catch (dayError) {
+                                            console.error('Error rendering day in Set Weights:', dayError, day);
+                                            return null;
+                                        }
                                     })}
                                 </div>
                                 
