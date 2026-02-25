@@ -801,6 +801,31 @@
                 }
             };
 
+            // Delete custom plan
+            const deleteCustomPlan = (planId, planName) => {
+                if (!confirm(`Delete "${planName}" plan? This cannot be undone.`)) {
+                    return;
+                }
+
+                try {
+                    const newPlans = { ...customPlans };
+                    delete newPlans[planId];
+                    setCustomPlans(newPlans);
+                    storage.set('custom-plans', JSON.stringify(newPlans));
+
+                    // If deleted plan was selected, switch to hypertrophy
+                    if (selectedPlan === planId) {
+                        setSelectedPlan('hypertrophy');
+                        storage.set('selected-plan', 'hypertrophy');
+                    }
+
+                    alert(`✅ ${planName} deleted!`);
+                } catch (error) {
+                    console.error('Error deleting plan:', error);
+                    alert('❌ Error deleting plan. Please try again.');
+                }
+            };
+
             // Get exercise targets (updated to handle custom sets/reps)
             const getExerciseTargetsEnhanced = (exercise) => {
                 // If exercise has custom sets/reps, use those
@@ -2229,21 +2254,32 @@
                             ))}
                             {/* Custom Plans */}
                             {Object.entries(customPlans).map(([key, plan]) => (
-                                <button
-                                    key={key}
-                                    onClick={() => {
-                                        setSelectedPlan(key);
-                                        storage.set('selected-plan', key);
-                                    }}
-                                    className={`p-3 rounded-lg font-semibold text-sm transition-all ${
-                                        selectedPlan === key
-                                            ? `bg-gradient-to-r ${plan.color} text-white shadow-md`
-                                            : 'bg-gray-100 text-gray-700 border border-gray-300'
-                                    }`}
-                                >
-                                    <div>{plan.name} ⭐</div>
-                                    <div className="text-xs opacity-80">{plan.mainLiftSets}×{plan.mainLiftReps}</div>
-                                </button>
+                                <div key={key} className="relative">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedPlan(key);
+                                            storage.set('selected-plan', key);
+                                        }}
+                                        className={`w-full p-3 rounded-lg font-semibold text-sm transition-all ${
+                                            selectedPlan === key
+                                                ? `bg-gradient-to-r ${plan.color} text-white shadow-md`
+                                                : 'bg-gray-100 text-gray-700 border border-gray-300'
+                                        }`}
+                                    >
+                                        <div>{plan.name} ⭐</div>
+                                        <div className="text-xs opacity-80">{plan.mainLiftSets}×{plan.mainLiftReps}</div>
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteCustomPlan(key, plan.name);
+                                        }}
+                                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-sm font-bold hover:bg-red-600 transition-colors shadow-md"
+                                        title="Delete plan"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
                             ))}
                             {/* Create Custom Plan Button */}
                             <button
