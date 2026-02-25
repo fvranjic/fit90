@@ -553,7 +553,15 @@
             };
 
             const getExerciseTargets = (exercise) => {
-                const plan = trainingPlans[selectedPlan];
+                const plan = customPlans[selectedPlan] || trainingPlans[selectedPlan];
+                if (!plan) {
+                    // Fallback to hypertrophy if plan not found
+                    const fallback = trainingPlans['hypertrophy'];
+                    return {
+                        sets: exercise.isMainLift ? fallback.mainLiftSets : fallback.accessorySets,
+                        reps: exercise.isMainLift ? fallback.mainLiftReps : fallback.accessoryReps
+                    };
+                }
                 if (exercise.reps === "max") {
                     return { sets: plan.accessorySets, reps: "max" };
                 }
@@ -761,12 +769,36 @@
 
             // Create custom training plan
             const createCustomPlan = (planData) => {
-                const planId = planData.name.toLowerCase().replace(/\s+/g, '-');
-                const newPlans = { ...customPlans, [planId]: planData };
-                setCustomPlans(newPlans);
-                storage.set('custom-plans', JSON.stringify(newPlans));
-                setShowCreatePlan(false);
-                alert(`✅ ${planData.name} plan created!`);
+                try {
+                    // Validate data
+                    if (!planData.name || !planData.mainLiftSets || !planData.mainLiftReps) {
+                        alert('❌ Please fill all required fields');
+                        return;
+                    }
+
+                    // Create plan ID
+                    const planId = planData.name.toLowerCase().replace(/\s+/g, '-');
+                    
+                    // Check for duplicate
+                    if (customPlans[planId] || trainingPlans[planId]) {
+                        alert('❌ A plan with this name already exists');
+                        return;
+                    }
+
+                    const newPlans = { ...customPlans, [planId]: planData };
+                    setCustomPlans(newPlans);
+                    storage.set('custom-plans', JSON.stringify(newPlans));
+                    
+                    // Automatically select the new plan
+                    setSelectedPlan(planId);
+                    storage.set('selected-plan', planId);
+                    
+                    setShowCreatePlan(false);
+                    alert(`✅ ${planData.name} plan created and selected!`);
+                } catch (error) {
+                    console.error('Error creating plan:', error);
+                    alert('❌ Error creating plan. Please try again.');
+                }
             };
 
             // Get exercise targets (updated to handle custom sets/reps)
@@ -778,6 +810,16 @@
                 
                 // Otherwise use plan defaults or exercise-specific
                 const plan = customPlans[selectedPlan] || trainingPlans[selectedPlan];
+                
+                // Fallback if plan not found
+                if (!plan) {
+                    const fallback = trainingPlans['hypertrophy'];
+                    return {
+                        sets: exercise.isMainLift ? fallback.mainLiftSets : fallback.accessorySets,
+                        reps: exercise.isMainLift ? fallback.mainLiftReps : fallback.accessoryReps
+                    };
+                }
+                
                 if (exercise.reps === "max") {
                     return { sets: plan.accessorySets, reps: "max" };
                 }
