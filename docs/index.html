@@ -535,11 +535,26 @@
 
             // Get exercises based on current split type
             const getExercisesForDay = (day) => {
+                // Normalize exercise to have all required properties
+                const normalizeExercise = (ex) => ({
+                    name: ex.name,
+                    isMainLift: ex.isMainLift || false,
+                    technique: ex.technique || 'normal',
+                    customSets: ex.customSets || null,
+                    customReps: ex.customReps || null,
+                    reps: ex.reps || undefined // Keep undefined if not specified
+                });
+
                 // If custom exercises exist for this day, use them; otherwise use template
+                let exercises = [];
                 if (customExercises[day]) {
-                    return customExercises[day];
+                    exercises = customExercises[day];
+                } else {
+                    exercises = splitTemplates[splitType]?.[day] || splitTemplates['full-body'][day] || [];
                 }
-                return splitTemplates[splitType]?.[day] || splitTemplates['full-body'][day] || [];
+
+                // Normalize all exercises
+                return exercises.map(normalizeExercise);
             };
 
             const exerciseData = {}; // Build exerciseData dynamically
@@ -1050,7 +1065,7 @@
 
                 // For bodyweight exercises, recommend increasing reps instead of weight
                 if (isBodyweight) {
-                    const plan = trainingPlans[selectedPlan];
+                    const plan = customPlans[selectedPlan] || trainingPlans[selectedPlan] || trainingPlans['hypertrophy'];
                     const targetSets = exercise.isMainLift ? plan.mainLiftSets : plan.accessorySets;
                     const targetReps = exercise.reps === "max" ? "max" : (exercise.isMainLift ? plan.mainLiftReps : plan.accessoryReps);
                     
@@ -1103,7 +1118,7 @@
                 }
 
                 // Get current plan targets
-                const plan = trainingPlans[selectedPlan];
+                const plan = customPlans[selectedPlan] || trainingPlans[selectedPlan] || trainingPlans['hypertrophy'];
                 const targetSets = exercise.isMainLift ? plan.mainLiftSets : plan.accessorySets;
                 const targetReps = exercise.isMainLift ? plan.mainLiftReps : plan.accessoryReps;
 
