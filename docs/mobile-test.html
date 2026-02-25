@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Diagnostic Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .test {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .pass { border-left: 4px solid #22c55e; }
+        .fail { border-left: 4px solid #ef4444; }
+        .title { font-weight: bold; margin-bottom: 10px; }
+        .detail { font-size: 12px; color: #666; font-family: monospace; }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 20px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>📱 Mobile Compatibility Test</h1>
+    <p>This page checks if your mobile browser can run the strength training app.</p>
+    
+    <div id="tests"></div>
+    
+    <button onclick="location.href='index.html'">Open Strength Training App</button>
+    
+    <script>
+        const tests = [];
+        
+        function addTest(name, result, detail) {
+            tests.push({ name, result, detail });
+        }
+        
+        // Test 1: localStorage
+        try {
+            localStorage.setItem('test', '1');
+            localStorage.removeItem('test');
+            addTest('localStorage', true, 'localStorage API available');
+        } catch (e) {
+            addTest('localStorage', false, 'Error: ' + e.message);
+        }
+        
+        // Test 2: React
+        if (typeof React !== 'undefined') {
+            addTest('React', true, 'React library loaded');
+        } else {
+            addTest('React', false, 'React library NOT loaded');
+        }
+        
+        // Test 3: ReactDOM
+        if (typeof ReactDOM !== 'undefined') {
+            addTest('ReactDOM', true, 'ReactDOM library loaded');
+        } else {
+            addTest('ReactDOM', false, 'ReactDOM library NOT loaded');
+        }
+        
+        // Test 4: Babel
+        try {
+            // This will fail if Babel doesn't work
+            eval('const test = () => { return true; };');
+            addTest('JavaScript ES6', true, 'Arrow functions work');
+        } catch (e) {
+            addTest('JavaScript ES6', false, 'Error: ' + e.message);
+        }
+        
+        // Test 5: User Agent
+        addTest('Browser Info', true, navigator.userAgent);
+        
+        // Test 6: Screen Size
+        addTest('Screen Size', true, `${window.innerWidth}x${window.innerHeight}`);
+        
+        // Test 7: Touch Support
+        if ('ontouchstart' in window) {
+            addTest('Touch Support', true, 'Touch events supported');
+        } else {
+            addTest('Touch Support', false, 'No touch support detected');
+        }
+        
+        // Display results
+        const testsDiv = document.getElementById('tests');
+        tests.forEach(test => {
+            const div = document.createElement('div');
+            div.className = `test ${test.result ? 'pass' : 'fail'}`;
+            div.innerHTML = `
+                <div class="title">${test.result ? '✅' : '❌'} ${test.name}</div>
+                <div class="detail">${test.detail || ''}</div>
+            `;
+            testsDiv.appendChild(div);
+        });
+        
+        // Show summary
+        const failed = tests.filter(t => !t.result).length;
+        if (failed > 0) {
+            const summary = document.createElement('div');
+            summary.style.cssText = 'background: #fee; color: #c00; padding: 15px; border-radius: 8px; margin-top: 20px; font-weight: bold;';
+            summary.textContent = `⚠️ ${failed} test(s) failed. The app may not work correctly on this device.`;
+            testsDiv.appendChild(summary);
+        } else {
+            const summary = document.createElement('div');
+            summary.style.cssText = 'background: #efe; color: #0a0; padding: 15px; border-radius: 8px; margin-top: 20px; font-weight: bold;';
+            summary.textContent = '✅ All tests passed! The app should work on this device.';
+            testsDiv.appendChild(summary);
+        }
+    </script>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+</body>
+</html>
