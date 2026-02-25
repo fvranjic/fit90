@@ -801,6 +801,31 @@
                 }
             };
 
+            // Delete custom plan
+            const deleteCustomPlan = (planId, planName) => {
+                if (!confirm(`Delete "${planName}" plan? This cannot be undone.`)) {
+                    return;
+                }
+
+                try {
+                    const newPlans = { ...customPlans };
+                    delete newPlans[planId];
+                    setCustomPlans(newPlans);
+                    storage.set('custom-plans', JSON.stringify(newPlans));
+
+                    // If deleted plan was selected, switch to hypertrophy
+                    if (selectedPlan === planId) {
+                        setSelectedPlan('hypertrophy');
+                        storage.set('selected-plan', 'hypertrophy');
+                    }
+
+                    alert(`✅ ${planName} deleted!`);
+                } catch (error) {
+                    console.error('Error deleting plan:', error);
+                    alert('❌ Error deleting plan. Please try again.');
+                }
+            };
+
             // Get exercise targets (updated to handle custom sets/reps)
             const getExerciseTargetsEnhanced = (exercise) => {
                 // If exercise has custom sets/reps, use those
@@ -1046,8 +1071,8 @@
             };
 
             const WorkoutLogger = ({ day }) => {
-                const exercises = exerciseData[day];
-                const currentPlan = trainingPlans[selectedPlan];
+                const exercises = exerciseData[day] || [];
+                const currentPlan = customPlans[selectedPlan] || trainingPlans[selectedPlan] || trainingPlans['hypertrophy'];
                 const [inputs, setInputs] = useState({});
                 const [completedExercises, setCompletedExercises] = useState({});
                 const [swappingExercise, setSwappingExercise] = useState(null);
@@ -1204,15 +1229,33 @@
                             </div>
                         )}
 
-                        <div className={`bg-gradient-to-r ${currentPlan.color} text-white p-4 rounded-lg`}>
+                        <div className={`bg-gradient-to-r ${currentPlan.color || 'from-blue-500 to-purple-600'} text-white p-4 rounded-lg`}>
                             <h2 className="text-2xl font-bold">Day {day} - {currentPlan.name}</h2>
-                            <p className="text-sm opacity-90">{currentPlan.description}</p>
+                            {currentPlan.description && <p className="text-sm opacity-90">{currentPlan.description}</p>}
                             <p className="text-xs opacity-80 mt-1">
                                 Main: {currentPlan.mainLiftSets}×{currentPlan.mainLiftReps} • 
-                                Accessory: {currentPlan.accessorySets}×{currentPlan.accessoryReps} • 
-                                Rest: {currentPlan.rest}
+                                Accessory: {currentPlan.accessorySets}×{currentPlan.accessoryReps}
+                                {currentPlan.rest && ` • Rest: ${currentPlan.rest}`}
                             </p>
                         </div>
+
+                        {/* No exercises message */}
+                        {exercises.length === 0 && (
+                            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 text-center">
+                                <div className="text-4xl mb-3">📋</div>
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">No Exercises for Day {day}</h3>
+                                <p className="text-gray-600 mb-4">Add exercises to this day to start training</p>
+                                <button
+                                    onClick={() => {
+                                        setSelectedDayForBrowse(day);
+                                        setShowExerciseBrowser(true);
+                                    }}
+                                    className="px-6 py-3 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition-all"
+                                >
+                                    + Add First Exercise
+                                </button>
+                            </div>
+                        )}
 
                         {exercises.map((exercise, idx) => {
                             const targets = getExerciseTargetsEnhanced(exercise);
@@ -2211,21 +2254,32 @@
                             ))}
                             {/* Custom Plans */}
                             {Object.entries(customPlans).map(([key, plan]) => (
-                                <button
-                                    key={key}
-                                    onClick={() => {
-                                        setSelectedPlan(key);
-                                        storage.set('selected-plan', key);
-                                    }}
-                                    className={`p-3 rounded-lg font-semibold text-sm transition-all ${
-                                        selectedPlan === key
-                                            ? `bg-gradient-to-r ${plan.color} text-white shadow-md`
-                                            : 'bg-gray-100 text-gray-700 border border-gray-300'
-                                    }`}
-                                >
-                                    <div>{plan.name} ⭐</div>
-                                    <div className="text-xs opacity-80">{plan.mainLiftSets}×{plan.mainLiftReps}</div>
-                                </button>
+                                <div key={key} className="relative">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedPlan(key);
+                                            storage.set('selected-plan', key);
+                                        }}
+                                        className={`w-full p-3 rounded-lg font-semibold text-sm transition-all ${
+                                            selectedPlan === key
+                                                ? `bg-gradient-to-r ${plan.color} text-white shadow-md`
+                                                : 'bg-gray-100 text-gray-700 border border-gray-300'
+                                        }`}
+                                    >
+                                        <div>{plan.name} ⭐</div>
+                                        <div className="text-xs opacity-80">{plan.mainLiftSets}×{plan.mainLiftReps}</div>
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteCustomPlan(key, plan.name);
+                                        }}
+                                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-sm font-bold hover:bg-red-600 transition-colors shadow-md"
+                                        title="Delete plan"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
                             ))}
                             {/* Create Custom Plan Button */}
                             <button
