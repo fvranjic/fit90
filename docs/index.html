@@ -1269,6 +1269,21 @@
                     );
                 }
 
+                // CRITICAL: Guarantee currentPlan is never null/undefined before render
+                if (!currentPlan || !currentPlan.mainLiftSets || !currentPlan.mainLiftReps) {
+                    console.error('FORCING FALLBACK - currentPlan invalid:', currentPlan);
+                    currentPlan = {
+                        name: 'Hypertrophy (Fallback)',
+                        mainLiftSets: 4,
+                        mainLiftReps: 10,
+                        accessorySets: 3,
+                        accessoryReps: 12,
+                        color: 'from-purple-500 to-pink-600',
+                        description: 'Fallback plan',
+                        rest: '90s'
+                    };
+                }
+
                 const handleInputChange = (exerciseName, field, value) => {
                     setInputs(prev => ({
                         ...prev,
@@ -1458,13 +1473,21 @@
                             </div>
                         )}
 
-                        {exercises.map((exercise, idx) => {
-                            const targets = getExerciseTargetsEnhanced(exercise);
-                            const recommended = getRecommendedWeight(exercise.name, currentMonth, day);
-                            const history = workoutData[`${exercise.name}-${day}`] || [];
-                            const lastWorkout = history[history.length - 1];
-                            const isCompleted = completedExercises[exercise.name]?.completed;
-                            const exerciseData = completedExercises[exercise.name]?.data || {};
+                        {/* Render exercises with safety checks */}
+                        {Array.isArray(exercises) && exercises.length > 0 && exercises.map((exercise, idx) => {
+                            // Safety check for exercise object
+                            if (!exercise || !exercise.name) {
+                                console.error('Invalid exercise at index:', idx, exercise);
+                                return null;
+                            }
+
+                            try {
+                                const targets = getExerciseTargetsEnhanced(exercise);
+                                const recommended = getRecommendedWeight(exercise.name, currentMonth, day);
+                                const history = workoutData[`${exercise.name}-${day}`] || [];
+                                const lastWorkout = history[history.length - 1];
+                                const isCompleted = completedExercises[exercise.name]?.completed;
+                                const exerciseData = completedExercises[exercise.name]?.data || {};
 
                             return (
                                 <div key={idx} className={`border-2 rounded-lg p-4 shadow-sm transition-all ${
@@ -1601,6 +1624,16 @@
                                     )}
                                 </div>
                             );
+                            } catch (error) {
+                                console.error(`Error rendering exercise at index ${idx}:`, error, exercise);
+                                return (
+                                    <div key={idx} className="border-2 border-red-500 rounded-lg p-4 bg-red-50">
+                                        <div className="font-bold text-red-800">⚠️ Error rendering exercise</div>
+                                        <div className="text-sm text-red-600">Exercise name: {exercise?.name || 'Unknown'}</div>
+                                        <div className="text-xs text-red-500 mt-1">Check console for details</div>
+                                    </div>
+                                );
+                            }
                         })}
 
                         {/* Add Exercise Button */}
