@@ -497,7 +497,13 @@
 
             // Get similar exercises for swapping
             const getSimilarExercises = (exerciseName) => {
-                const exercise = exerciseDatabase[exerciseName];
+                // Create merged exercise lookup (database + user exercises)
+                const allExercisesMap = { ...exerciseDatabase };
+                userAddedExercises.forEach(ex => {
+                    allExercisesMap[ex.name] = ex;
+                });
+
+                const exercise = allExercisesMap[exerciseName];
                 if (!exercise) return [];
 
                 // Special handling for squat variations - they can all swap with each other
@@ -508,8 +514,8 @@
                 
                 if (squatVariations.includes(exerciseName)) {
                     return squatVariations
-                        .filter(name => name !== exerciseName && exerciseDatabase[name])
-                        .map(name => ({ name, ...exerciseDatabase[name] }))
+                        .filter(name => name !== exerciseName && allExercisesMap[name])
+                        .map(name => ({ name, ...allExercisesMap[name] }))
                         .sort((a, b) => {
                             if (a.isCompound !== b.isCompound) return b.isCompound ? 1 : -1;
                             return 0;
@@ -524,16 +530,16 @@
                 
                 if (deadliftVariations.includes(exerciseName)) {
                     return deadliftVariations
-                        .filter(name => name !== exerciseName && exerciseDatabase[name])
-                        .map(name => ({ name, ...exerciseDatabase[name] }))
+                        .filter(name => name !== exerciseName && allExercisesMap[name])
+                        .map(name => ({ name, ...allExercisesMap[name] }))
                         .sort((a, b) => {
                             if (a.isCompound !== b.isCompound) return b.isCompound ? 1 : -1;
                             return 0;
                         });
                 }
 
-                // For all other exercises, match by category and type
-                return Object.entries(exerciseDatabase)
+                // For all other exercises, match by category and type from ALL exercises
+                return Object.entries(allExercisesMap)
                     .filter(([name, info]) => 
                         name !== exerciseName && 
                         info.category === exercise.category && 
@@ -547,7 +553,15 @@
             };
 
             const getExerciseTargets = (exercise) => {
-                const plan = trainingPlans[selectedPlan];
+                const plan = customPlans[selectedPlan] || trainingPlans[selectedPlan];
+                if (!plan) {
+                    // Fallback to hypertrophy if plan not found
+                    const fallback = trainingPlans['hypertrophy'];
+                    return {
+                        sets: exercise.isMainLift ? fallback.mainLiftSets : fallback.accessorySets,
+                        reps: exercise.isMainLift ? fallback.mainLiftReps : fallback.accessoryReps
+                    };
+                }
                 if (exercise.reps === "max") {
                     return { sets: plan.accessorySets, reps: "max" };
                 }
@@ -717,11 +731,29 @@
 
             // Create custom exercise
             const createCustomExercise = (exerciseData) => {
-                const updated = [...userAddedExercises, exerciseData];
-                setUserAddedExercises(updated);
-                storage.set('user-exercises', JSON.stringify(updated));
-                setShowAddCustomExercise(false);
-                alert(`✅ ${exerciseData.name} created!`);
+                try {
+                    // Validate data
+                    if (!exerciseData.name || !exerciseData.category || !exerciseData.type) {
+                        alert('❌ Please fill all required fields');
+                        return;
+                    }
+
+                    // Check for duplicate name
+                    const allExercises = getAllExercises();
+                    if (allExercises.some(ex => ex.name.toLowerCase() === exerciseData.name.toLowerCase())) {
+                        alert('❌ An exercise with this name already exists');
+                        return;
+                    }
+
+                    const updated = [...userAddedExercises, exerciseData];
+                    setUserAddedExercises(updated);
+                    storage.set('user-exercises', JSON.stringify(updated));
+                    setShowAddCustomExercise(false);
+                    alert(`✅ ${exerciseData.name} created!`);
+                } catch (error) {
+                    console.error('Error creating exercise:', error);
+                    alert('❌ Error creating exercise. Please try again.');
+                }
             };
 
             // Update exercise settings
@@ -737,12 +769,36 @@
 
             // Create custom training plan
             const createCustomPlan = (planData) => {
-                const planId = planData.name.toLowerCase().replace(/\s+/g, '-');
-                const newPlans = { ...customPlans, [planId]: planData };
-                setCustomPlans(newPlans);
-                storage.set('custom-plans', JSON.stringify(newPlans));
-                setShowCreatePlan(false);
-                alert(`✅ ${planData.name} plan created!`);
+                try {
+                    // Validate data
+                    if (!planData.name || !planData.mainLiftSets || !planData.mainLiftReps) {
+                        alert('❌ Please fill all required fields');
+                        return;
+                    }
+
+                    // Create plan ID
+                    const planId = planData.name.toLowerCase().replace(/\s+/g, '-');
+                    
+                    // Check for duplicate
+                    if (customPlans[planId] || trainingPlans[planId]) {
+                        alert('❌ A plan with this name already exists');
+                        return;
+                    }
+
+                    const newPlans = { ...customPlans, [planId]: planData };
+                    setCustomPlans(newPlans);
+                    storage.set('custom-plans', JSON.stringify(newPlans));
+                    
+                    // Automatically select the new plan
+                    setSelectedPlan(planId);
+                    storage.set('selected-plan', planId);
+                    
+                    setShowCreatePlan(false);
+                    alert(`✅ ${planData.name} plan created and selected!`);
+                } catch (error) {
+                    console.error('Error creating plan:', error);
+                    alert('❌ Error creating plan. Please try again.');
+                }
             };
 
             // Get exercise targets (updated to handle custom sets/reps)
@@ -754,6 +810,16 @@
                 
                 // Otherwise use plan defaults or exercise-specific
                 const plan = customPlans[selectedPlan] || trainingPlans[selectedPlan];
+                
+                // Fallback if plan not found
+                if (!plan) {
+                    const fallback = trainingPlans['hypertrophy'];
+                    return {
+                        sets: exercise.isMainLift ? fallback.mainLiftSets : fallback.accessorySets,
+                        reps: exercise.isMainLift ? fallback.mainLiftReps : fallback.accessoryReps
+                    };
+                }
+                
                 if (exercise.reps === "max") {
                     return { sets: plan.accessorySets, reps: "max" };
                 }
@@ -1680,7 +1746,10 @@
                                 {/* Footer */}
                                 <div className="p-4 border-t bg-gray-50">
                                     <button
-                                        onClick={() => setShowAddCustomExercise(true)}
+                                        onClick={() => {
+                                            setShowExerciseBrowser(false);
+                                            setShowAddCustomExercise(true);
+                                        }}
                                         className="w-full px-4 py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors"
                                     >
                                         + Create Custom Exercise
