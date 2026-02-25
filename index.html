@@ -1046,8 +1046,8 @@
             };
 
             const WorkoutLogger = ({ day }) => {
-                const exercises = exerciseData[day];
-                const currentPlan = trainingPlans[selectedPlan];
+                const exercises = exerciseData[day] || [];
+                const currentPlan = customPlans[selectedPlan] || trainingPlans[selectedPlan] || trainingPlans['hypertrophy'];
                 const [inputs, setInputs] = useState({});
                 const [completedExercises, setCompletedExercises] = useState({});
                 const [swappingExercise, setSwappingExercise] = useState(null);
@@ -1204,15 +1204,33 @@
                             </div>
                         )}
 
-                        <div className={`bg-gradient-to-r ${currentPlan.color} text-white p-4 rounded-lg`}>
+                        <div className={`bg-gradient-to-r ${currentPlan.color || 'from-blue-500 to-purple-600'} text-white p-4 rounded-lg`}>
                             <h2 className="text-2xl font-bold">Day {day} - {currentPlan.name}</h2>
-                            <p className="text-sm opacity-90">{currentPlan.description}</p>
+                            {currentPlan.description && <p className="text-sm opacity-90">{currentPlan.description}</p>}
                             <p className="text-xs opacity-80 mt-1">
                                 Main: {currentPlan.mainLiftSets}×{currentPlan.mainLiftReps} • 
-                                Accessory: {currentPlan.accessorySets}×{currentPlan.accessoryReps} • 
-                                Rest: {currentPlan.rest}
+                                Accessory: {currentPlan.accessorySets}×{currentPlan.accessoryReps}
+                                {currentPlan.rest && ` • Rest: ${currentPlan.rest}`}
                             </p>
                         </div>
+
+                        {/* No exercises message */}
+                        {exercises.length === 0 && (
+                            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 text-center">
+                                <div className="text-4xl mb-3">📋</div>
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">No Exercises for Day {day}</h3>
+                                <p className="text-gray-600 mb-4">Add exercises to this day to start training</p>
+                                <button
+                                    onClick={() => {
+                                        setSelectedDayForBrowse(day);
+                                        setShowExerciseBrowser(true);
+                                    }}
+                                    className="px-6 py-3 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition-all"
+                                >
+                                    + Add First Exercise
+                                </button>
+                            </div>
+                        )}
 
                         {exercises.map((exercise, idx) => {
                             const targets = getExerciseTargetsEnhanced(exercise);
