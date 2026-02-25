@@ -1115,8 +1115,38 @@
             };
 
             const WorkoutLogger = ({ day }) => {
+                // ALL HOOKS MUST BE AT TOP LEVEL - React requirement
+                const [inputs, setInputs] = useState({});
+                const [completedExercises, setCompletedExercises] = useState({});
+                const [swappingExercise, setSwappingExercise] = useState(null);
+                const [renderError, setRenderError] = useState(null);
+                
+                const workoutKey = `day-${day}-completed`;
+                const todayKey = new Date().toDateString();
+                const lastCompletedKey = `${workoutKey}-${todayKey}`;
+
+                // Load completed exercises
+                useEffect(() => {
+                    const loadCompletion = () => {
+                        try {
+                            const result = storage.get(lastCompletedKey);
+                            if (result) {
+                                setCompletedExercises(JSON.parse(result.value));
+                            }
+                        } catch (error) {
+                            console.error('Error loading completion:', error);
+                            setCompletedExercises({});
+                        }
+                    };
+                    loadCompletion();
+                }, [day, lastCompletedKey]);
+
+                // Get exercises and plan safely
+                let exercises = [];
+                let currentPlan = null;
+                
                 try {
-                    const exercises = exerciseData[day] || [];
+                    exercises = exerciseData[day] || [];
                     
                     console.log('WorkoutLogger starting:', {
                         day,
@@ -1127,8 +1157,8 @@
                         trainingPlansKeys: Object.keys(trainingPlans)
                     });
                     
-                    // Ensure we always have a valid plan with all required fields
-                    let currentPlan = customPlans[selectedPlan] || trainingPlans[selectedPlan];
+                    // Get plan with fallback
+                    currentPlan = customPlans[selectedPlan] || trainingPlans[selectedPlan];
                     
                     if (!currentPlan) {
                         console.warn('No plan found for:', selectedPlan);
@@ -1145,37 +1175,47 @@
                         };
                     }
                     
-                    // Ensure plan has all required properties
+                    // Validate plan has required properties
                     if (!currentPlan.mainLiftSets || !currentPlan.mainLiftReps || !currentPlan.accessorySets || !currentPlan.accessoryReps) {
                         console.error('Plan missing required properties:', currentPlan);
-                        throw new Error(`Invalid plan: ${JSON.stringify(currentPlan)}`);
+                        setRenderError(`Invalid plan: missing required properties`);
+                        currentPlan = trainingPlans['hypertrophy']; // Force fallback
                     }
                     
                     console.log('WorkoutLogger using plan:', currentPlan);
-                    
-                    const [inputs, setInputs] = useState({});
-                    const [completedExercises, setCompletedExercises] = useState({});
-                    const [swappingExercise, setSwappingExercise] = useState(null);
-                    
-                    console.log('WorkoutLogger render:', { day, exercisesCount: exercises.length, plan: currentPlan.name });
-                    
-                    const workoutKey = `day-${day}-completed`;
-                    const todayKey = new Date().toDateString();
-                    const lastCompletedKey = `${workoutKey}-${todayKey}`;
-
-                useEffect(() => {
-                    const loadCompletion = () => {
-                        try {
-                            const result = storage.get(lastCompletedKey);
-                            if (result) {
-                                setCompletedExercises(JSON.parse(result.value));
-                            }
-                        } catch (error) {
-                            setCompletedExercises({});
-                        }
+                } catch (error) {
+                    console.error('CRITICAL ERROR setting up WorkoutLogger:', error);
+                    setRenderError(error.message);
+                    // Provide safe fallbacks
+                    exercises = [];
+                    currentPlan = trainingPlans['hypertrophy'] || {
+                        name: 'Hypertrophy',
+                        mainLiftSets: 4,
+                        mainLiftReps: 10,
+                        accessorySets: 3,
+                        accessoryReps: 12,
+                        color: 'from-purple-500 to-pink-600'
                     };
-                    loadCompletion();
-                }, [day, lastCompletedKey]);
+                }
+
+                // Show error UI if there was a setup error
+                if (renderError) {
+                    return (
+                        <div className="bg-red-50 border-4 border-red-500 rounded-lg p-6">
+                            <h3 className="text-xl font-bold text-red-800 mb-2">⚠️ Error Loading Workout</h3>
+                            <p className="text-red-700 mb-4">{renderError}</p>
+                            <button 
+                                onClick={() => {
+                                    setRenderError(null);
+                                    window.location.reload();
+                                }} 
+                                className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold"
+                            >
+                                Reload Page
+                            </button>
+                        </div>
+                    );
+                }
 
                 const handleInputChange = (exerciseName, field, value) => {
                     setInputs(prev => ({
@@ -1539,24 +1579,6 @@
                         )}
                     </div>
                 );
-                } catch (error) {
-                    console.error('CRITICAL ERROR in WorkoutLogger:', error);
-                    return (
-                        <div className="bg-red-50 border-4 border-red-500 rounded-lg p-6">
-                            <h3 className="text-xl font-bold text-red-800 mb-2">⚠️ Error Loading Workout</h3>
-                            <p className="text-red-700 mb-4">Something went wrong. Please check console (F12) for details.</p>
-                            <button 
-                                onClick={() => window.location.reload()} 
-                                className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold"
-                            >
-                                Reload Page
-                            </button>
-                            <pre className="mt-4 text-xs bg-white p-2 rounded overflow-auto">
-                                {error.toString()}
-                            </pre>
-                        </div>
-                    );
-                }
             };
 
             const ConditioningLogger = ({workoutTypeOverride}) => {
