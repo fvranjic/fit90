@@ -1049,37 +1049,66 @@
             };
 
             const logWorkout = (exerciseName, day, sets, reps, weight) => {
-                const key = `${exerciseName}-${day}`;
-                const history = workoutData[key] || [];
-                
-                const newEntry = {
-                    date: new Date().toISOString(),
-                    month: currentMonth,
-                    sets: parseInt(sets),
-                    reps: reps === "max" ? reps : parseInt(reps),
-                    weight: parseFloat(weight),
-                    oneRM: calculate1RM(weight, reps)
-                };
+                try {
+                    console.log('logWorkout called:', { exerciseName, day, sets, reps, weight });
+                    
+                    if (!exerciseName || !day) {
+                        console.error('Missing exerciseName or day');
+                        alert('Error: Missing exercise information');
+                        return;
+                    }
 
-                const updatedData = {
-                    ...workoutData,
-                    [key]: [...history, newEntry]
-                };
+                    const key = `${exerciseName}-${day}`;
+                    const history = workoutData[key] || [];
+                    
+                    const parsedSets = parseInt(sets);
+                    const parsedReps = reps === "max" ? reps : parseInt(reps);
+                    const parsedWeight = parseFloat(weight);
 
-                setWorkoutData(updatedData);
-                saveData(updatedData, currentMonth);
+                    if (isNaN(parsedSets) || (parsedReps !== "max" && isNaN(parsedReps)) || isNaN(parsedWeight)) {
+                        alert('Please enter valid numbers for sets, reps, and weight');
+                        return;
+                    }
+                    
+                    const newEntry = {
+                        date: new Date().toISOString(),
+                        month: currentMonth,
+                        sets: parsedSets,
+                        reps: parsedReps,
+                        weight: parsedWeight,
+                        oneRM: calculate1RM(parsedWeight, parsedReps)
+                    };
+
+                    console.log('Creating new entry:', newEntry);
+
+                    const updatedData = {
+                        ...workoutData,
+                        [key]: [...history, newEntry]
+                    };
+
+                    setWorkoutData(updatedData);
+                    saveData(updatedData, currentMonth);
+                    
+                    console.log('Workout logged successfully');
+                } catch (error) {
+                    console.error('Error logging workout:', error);
+                    alert('Error saving workout. Check console for details.');
+                }
             };
 
             const WorkoutLogger = ({ day }) => {
-                const exercises = exerciseData[day] || [];
-                const currentPlan = customPlans[selectedPlan] || trainingPlans[selectedPlan] || trainingPlans['hypertrophy'];
-                const [inputs, setInputs] = useState({});
-                const [completedExercises, setCompletedExercises] = useState({});
-                const [swappingExercise, setSwappingExercise] = useState(null);
-                
-                const workoutKey = `day-${day}-completed`;
-                const todayKey = new Date().toDateString();
-                const lastCompletedKey = `${workoutKey}-${todayKey}`;
+                try {
+                    const exercises = exerciseData[day] || [];
+                    const currentPlan = customPlans[selectedPlan] || trainingPlans[selectedPlan] || trainingPlans['hypertrophy'];
+                    const [inputs, setInputs] = useState({});
+                    const [completedExercises, setCompletedExercises] = useState({});
+                    const [swappingExercise, setSwappingExercise] = useState(null);
+                    
+                    console.log('WorkoutLogger render:', { day, exercisesCount: exercises.length, plan: currentPlan.name });
+                    
+                    const workoutKey = `day-${day}-completed`;
+                    const todayKey = new Date().toDateString();
+                    const lastCompletedKey = `${workoutKey}-${todayKey}`;
 
                 useEffect(() => {
                     const loadCompletion = () => {
@@ -1106,23 +1135,32 @@
                 };
 
                 const handleCompleteExercise = (exercise) => {
-                    const input = inputs[exercise.name];
-                    if (!input?.weight || !input?.reps || !input?.sets) {
-                        alert('Please enter sets, reps, and weight');
-                        return;
+                    try {
+                        console.log('handleCompleteExercise called:', exercise);
+                        
+                        const input = inputs[exercise.name];
+                        console.log('Input data:', input);
+                        
+                        if (!input?.weight || !input?.reps || !input?.sets) {
+                            alert('Please enter sets, reps, and weight');
+                            return;
+                        }
+
+                        logWorkout(exercise.name, day, input.sets, input.reps, input.weight);
+                        
+                        const newCompleted = {
+                            ...completedExercises,
+                            [exercise.name]: { completed: true, data: input }
+                        };
+
+                        setCompletedExercises(newCompleted);
+                        storage.set(lastCompletedKey, JSON.stringify(newCompleted));
+                        
+                        alert(`${exercise.name} completed!`);
+                    } catch (error) {
+                        console.error('Error in handleCompleteExercise:', error);
+                        alert('Error completing exercise. Check console for details.');
                     }
-
-                    logWorkout(exercise.name, day, input.sets, input.reps, input.weight);
-                    
-                    const newCompleted = {
-                        ...completedExercises,
-                        [exercise.name]: { completed: true, data: input }
-                    };
-
-                    setCompletedExercises(newCompleted);
-                    storage.set(lastCompletedKey, JSON.stringify(newCompleted));
-                    
-                    alert(`${exercise.name} completed!`);
                 };
 
                 const handleCompleteDay = () => {
@@ -1448,6 +1486,24 @@
                         )}
                     </div>
                 );
+                } catch (error) {
+                    console.error('CRITICAL ERROR in WorkoutLogger:', error);
+                    return (
+                        <div className="bg-red-50 border-4 border-red-500 rounded-lg p-6">
+                            <h3 className="text-xl font-bold text-red-800 mb-2">⚠️ Error Loading Workout</h3>
+                            <p className="text-red-700 mb-4">Something went wrong. Please check console (F12) for details.</p>
+                            <button 
+                                onClick={() => window.location.reload()} 
+                                className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold"
+                            >
+                                Reload Page
+                            </button>
+                            <pre className="mt-4 text-xs bg-white p-2 rounded overflow-auto">
+                                {error.toString()}
+                            </pre>
+                        </div>
+                    );
+                }
             };
 
             const ConditioningLogger = ({workoutTypeOverride}) => {
