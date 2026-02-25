@@ -7,8 +7,8 @@
     <meta name="theme-color" content="#2563eb">
     <title>Strength Training Tracker</title>
     
-    <!-- PWA Support -->
-    <link rel="manifest" href="manifest.json">
+    <!-- PWA Support - Disabled until manifest.json is created -->
+    <!-- <link rel="manifest" href="manifest.json"> -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -19,7 +19,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Register Service Worker -->
+    <!-- Service Worker Disabled - Causing Issues on GitHub Pages -->
+    <!--
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -29,6 +30,7 @@
             });
         }
     </script>
+    -->
     
     <style>
         body {
@@ -1552,13 +1554,34 @@
                         )}
 
                         <div className={`bg-gradient-to-r ${currentPlan.color || 'from-blue-500 to-purple-600'} text-white p-4 rounded-lg`}>
-                            <h2 className="text-2xl font-bold">Day {day} - {currentPlan.name}</h2>
-                            {currentPlan.description && <p className="text-sm opacity-90">{currentPlan.description}</p>}
-                            <p className="text-xs opacity-80 mt-1">
-                                Main: {currentPlan.mainLiftSets}×{currentPlan.mainLiftReps} • 
-                                Accessory: {currentPlan.accessorySets}×{currentPlan.accessoryReps}
-                                {currentPlan.rest && ` • Rest: ${currentPlan.rest}`}
-                            </p>
+                            <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                    <h2 className="text-2xl font-bold">Day {day} - {currentPlan.name}</h2>
+                                    {currentPlan.description && <p className="text-sm opacity-90">{currentPlan.description}</p>}
+                                    <p className="text-xs opacity-80 mt-1">
+                                        Main: {currentPlan.mainLiftSets}×{currentPlan.mainLiftReps} • 
+                                        Accessory: {currentPlan.accessorySets}×{currentPlan.accessoryReps}
+                                        {currentPlan.rest && ` • Rest: ${currentPlan.rest}`}
+                                    </p>
+                                </div>
+                                {Object.keys(completedExercises).length > 0 && (
+                                    <button
+                                        onClick={() => {
+                                            if (confirm('Reset all completed exercises for today? This will not delete your workout history.')) {
+                                                setCompletedExercises({});
+                                                storage.delete(lastCompletedKey);
+                                                setInputs({});
+                                                alert('✅ Day reset! All exercises marked as incomplete.');
+                                            }
+                                        }}
+                                        className="ml-4 px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg font-semibold text-sm transition-all flex items-center gap-2"
+                                        title="Reset all completed exercises for today"
+                                    >
+                                        <span className="text-lg">↻</span>
+                                        <span className="hidden sm:inline">Reset Day</span>
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         {/* No exercises message */}
