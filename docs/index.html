@@ -828,30 +828,48 @@
 
             // Get exercise targets (updated to handle custom sets/reps)
             const getExerciseTargetsEnhanced = (exercise) => {
-                // If exercise has custom sets/reps, use those
-                if (exercise.customSets && exercise.customReps) {
-                    return { sets: exercise.customSets, reps: exercise.customReps };
-                }
-                
-                // Otherwise use plan defaults or exercise-specific
-                const plan = customPlans[selectedPlan] || trainingPlans[selectedPlan];
-                
-                // Fallback if plan not found
-                if (!plan) {
-                    const fallback = trainingPlans['hypertrophy'];
-                    return {
-                        sets: exercise.isMainLift ? fallback.mainLiftSets : fallback.accessorySets,
-                        reps: exercise.isMainLift ? fallback.mainLiftReps : fallback.accessoryReps
+                try {
+                    // If exercise has custom sets/reps, use those
+                    if (exercise?.customSets && exercise?.customReps) {
+                        console.log('Using custom sets/reps:', exercise.customSets, exercise.customReps);
+                        return { sets: exercise.customSets, reps: exercise.customReps };
+                    }
+                    
+                    console.log('Looking for plan:', selectedPlan);
+                    console.log('Available custom plans:', Object.keys(customPlans));
+                    console.log('Available training plans:', Object.keys(trainingPlans));
+                    
+                    // Otherwise use plan defaults or exercise-specific
+                    const plan = customPlans[selectedPlan] || trainingPlans[selectedPlan];
+                    
+                    console.log('Found plan:', plan ? plan.name : 'NOT FOUND');
+                    
+                    // Fallback if plan not found
+                    if (!plan) {
+                        console.warn('Plan not found! Using hypertrophy fallback');
+                        const fallback = trainingPlans['hypertrophy'];
+                        return {
+                            sets: exercise.isMainLift ? fallback.mainLiftSets : fallback.accessorySets,
+                            reps: exercise.isMainLift ? fallback.mainLiftReps : fallback.accessoryReps
+                        };
+                    }
+                    
+                    if (exercise.reps === "max") {
+                        return { sets: plan.accessorySets, reps: "max" };
+                    }
+                    
+                    const result = {
+                        sets: exercise.isMainLift ? plan.mainLiftSets : plan.accessorySets,
+                        reps: exercise.isMainLift ? plan.mainLiftReps : plan.accessoryReps
                     };
+                    
+                    console.log('Returning targets:', result);
+                    return result;
+                } catch (error) {
+                    console.error('Error in getExerciseTargetsEnhanced:', error);
+                    // Ultimate fallback
+                    return { sets: 4, reps: 10 };
                 }
-                
-                if (exercise.reps === "max") {
-                    return { sets: plan.accessorySets, reps: "max" };
-                }
-                return {
-                    sets: exercise.isMainLift ? plan.mainLiftSets : plan.accessorySets,
-                    reps: exercise.isMainLift ? plan.mainLiftReps : plan.accessoryReps
-                };
             };
 
             const importProgress = () => {
@@ -1099,7 +1117,42 @@
             const WorkoutLogger = ({ day }) => {
                 try {
                     const exercises = exerciseData[day] || [];
-                    const currentPlan = customPlans[selectedPlan] || trainingPlans[selectedPlan] || trainingPlans['hypertrophy'];
+                    
+                    console.log('WorkoutLogger starting:', {
+                        day,
+                        selectedPlan,
+                        hasCustomPlan: !!customPlans[selectedPlan],
+                        hasTrainingPlan: !!trainingPlans[selectedPlan],
+                        customPlansKeys: Object.keys(customPlans),
+                        trainingPlansKeys: Object.keys(trainingPlans)
+                    });
+                    
+                    // Ensure we always have a valid plan with all required fields
+                    let currentPlan = customPlans[selectedPlan] || trainingPlans[selectedPlan];
+                    
+                    if (!currentPlan) {
+                        console.warn('No plan found for:', selectedPlan);
+                        console.log('Falling back to hypertrophy');
+                        currentPlan = trainingPlans['hypertrophy'] || {
+                            name: 'Hypertrophy',
+                            mainLiftSets: 4,
+                            mainLiftReps: 10,
+                            accessorySets: 3,
+                            accessoryReps: 12,
+                            color: 'from-purple-500 to-pink-600',
+                            description: 'Build muscle',
+                            rest: '90s'
+                        };
+                    }
+                    
+                    // Ensure plan has all required properties
+                    if (!currentPlan.mainLiftSets || !currentPlan.mainLiftReps || !currentPlan.accessorySets || !currentPlan.accessoryReps) {
+                        console.error('Plan missing required properties:', currentPlan);
+                        throw new Error(`Invalid plan: ${JSON.stringify(currentPlan)}`);
+                    }
+                    
+                    console.log('WorkoutLogger using plan:', currentPlan);
+                    
                     const [inputs, setInputs] = useState({});
                     const [completedExercises, setCompletedExercises] = useState({});
                     const [swappingExercise, setSwappingExercise] = useState(null);
@@ -2356,40 +2409,10 @@
                         </div>
                     </div>
 
-                    {/* Workout Type Toggle */}
-                    <div className="bg-white border-b-2 border-gray-200 p-4">
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => {
-                                    setWorkoutType('strength');
-                                    storage.set('workout-type', 'strength');
-                                }}
-                                className={`flex-1 py-3 rounded-lg font-semibold transition-all ${
-                                    workoutType === 'strength'
-                                        ? 'bg-blue-500 text-white shadow-md'
-                                        : 'bg-gray-100 text-gray-700'
-                                }`}
-                            >
-                                💪 Strength
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setWorkoutType('conditioning');
-                                    storage.set('workout-type', 'conditioning');
-                                }}
-                                className={`flex-1 py-3 rounded-lg font-semibold transition-all ${
-                                    workoutType === 'conditioning'
-                                        ? 'bg-blue-500 text-white shadow-md'
-                                        : 'bg-gray-100 text-gray-700'
-                                }`}
-                            >
-                                🔥 Conditioning
-                            </button>
-                        </div>
-                    </div>
+                    {/* Removed global Workout Type Toggle - now uses per-day types only */}
 
-                    {/* Conditioning Type Selector (shown when conditioning is selected) */}
-                    {workoutType === 'conditioning' && (
+                    {/* Conditioning Type Selector (shown when ANY day is conditioning) */}
+                    {Object.values(dayTypes).some(type => ['circuit', 'mma', 'boxing'].includes(type)) && (
                         <div className="bg-white border-b-2 border-gray-200 p-4">
                             <h3 className="text-sm font-semibold text-gray-600 mb-2">SELECT CONDITIONING TYPE:</h3>
                             <div className="grid grid-cols-2 gap-2">
@@ -2454,10 +2477,10 @@
                     <div className="p-4">
                         {activeTab === 'workout' && (
                             <>
-                                {workoutType === 'strength' ? (
-                                    <>
-                                        {/* Day selector buttons */}
-                                        <div className="flex gap-2 mb-4 flex-wrap">
+                                {/* Always show day selector - each day has its own type */}
+                                <>
+                                    {/* Day selector buttons */}
+                                    <div className="flex gap-2 mb-4 flex-wrap">
                                             {Array.from({length: trainingDays}, (_, i) => i + 1).map(day => (
                                                 <button
                                                     key={day}
@@ -2574,9 +2597,6 @@
                                             <ConditioningLogger workoutTypeOverride="boxing" />
                                         )}
                                     </>
-                                ) : (
-                                    <ConditioningLogger />
-                                )}
                             </>
                         )}
 
