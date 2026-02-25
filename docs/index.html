@@ -2326,19 +2326,19 @@
                                     <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-3 mb-4">
                                         <p className="text-sm text-blue-900">
                                             <strong>How it works:</strong> Enter the weight and reps for a recent max effort set. 
-                                            The app will calculate your 1RM and set appropriate starting weights based on your {trainingPlans[selectedPlan].name} plan.
+                                            The app will calculate your 1RM and set appropriate starting weights based on your {(customPlans[selectedPlan] || trainingPlans[selectedPlan] || trainingPlans['hypertrophy']).name} plan.
                                         </p>
                                     </div>
 
                                     {Array.from({length: trainingDays}, (_, i) => i + 1).map(day => {
                                         const exercises = exerciseData[day];
-                                        if (!exercises) return null;
+                                        if (!exercises || exercises.length === 0) return null;
                                         
                                         return (
                                             <div key={day} className="mb-6">
                                                 <h4 className="font-bold text-lg mb-3 text-gray-800">Day {day}</h4>
                                                 <div className="space-y-3">
-                                                    {exercises.map((exercise, idx) => (
+                                                    {exercises.filter(ex => ex && ex.name).map((exercise, idx) => (
                                                         <div key={idx} className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3">
                                                             <div className="flex items-center gap-2 mb-2">
                                                                 <h5 className="font-semibold">{exercise.name}</h5>
