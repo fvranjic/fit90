@@ -39,9 +39,101 @@
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <div id="loading-screen" style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div style="text-align: center; padding: 30px; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 400px; margin: 20px;">
+                <div style="font-size: 64px; margin-bottom: 20px; animation: pulse 2s infinite;">💪</div>
+                <div style="font-size: 24px; font-weight: bold; color: #1f2937; margin-bottom: 10px;">Loading Strength Training App</div>
+                <div style="font-size: 14px; color: #6b7280; margin-bottom: 20px;">Please wait...</div>
+                <div style="width: 100%; height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden;">
+                    <div style="width: 30%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); animation: loading 2s infinite;"></div>
+                </div>
+                <div id="loading-status" style="font-size: 12px; color: #9ca3af; margin-top: 15px;">Initializing...</div>
+            </div>
+        </div>
+    </div>
+    
+    <style>
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        @keyframes loading {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
+        }
+    </style>
+    
+    <script>
+        // Update loading status
+        setTimeout(() => { document.getElementById('loading-status').textContent = 'Loading libraries...'; }, 500);
+        setTimeout(() => { document.getElementById('loading-status').textContent = 'Starting app...'; }, 1500);
+    </script>
 
     <script type="text/babel">
+        // Mobile/Babel Compatibility Check
+        (function() {
+            const checkInterval = setInterval(function() {
+                const root = document.getElementById('root');
+                const loadingScreen = document.getElementById('loading-screen');
+                
+                // Check if React app has rendered (look for our app structure)
+                const appRendered = root && (
+                    root.querySelector('.min-h-screen') || 
+                    root.querySelector('[class*="bg-gray"]') ||
+                    root.children.length > 1 ||
+                    !loadingScreen
+                );
+                
+                if (appRendered) {
+                    clearInterval(checkInterval);
+                    return;
+                }
+            }, 500);
+            
+            // After 5 seconds, if still loading, show error
+            setTimeout(function() {
+                clearInterval(checkInterval);
+                const root = document.getElementById('root');
+                const loadingScreen = document.getElementById('loading-screen');
+                
+                if (loadingScreen && loadingScreen.parentNode) {
+                    // Still showing loading screen = Babel failed
+                    root.innerHTML = `
+                        <div style="min-height: 100vh; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); display: flex; align-items: center; justify-content: center; padding: 20px;">
+                            <div style="background: white; border-radius: 20px; padding: 30px; max-width: 500px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);">
+                                <div style="font-size: 48px; text-align: center; margin-bottom: 20px;">⚠️</div>
+                                <h2 style="color: #dc2626; margin: 0 0 15px 0; font-size: 24px; text-align: center;">Mobile Browser Compatibility Issue</h2>
+                                
+                                <div style="background: #fef2f2; border-left: 4px solid #f87171; padding: 15px; margin: 20px 0; border-radius: 8px;">
+                                    <p style="margin: 0; color: #991b1b; font-size: 14px;">
+                                        <strong>Problem:</strong> Your browser cannot run this app's code transpiler.
+                                    </p>
+                                </div>
+                                
+                                <h3 style="font-size: 16px; margin: 20px 0 10px 0; color: #1f2937;">✅ Solutions (try in order):</h3>
+                                <ol style="margin: 0; padding-left: 25px; color: #4b5563;">
+                                    <li style="margin: 8px 0;"><strong>Use Chrome Browser</strong><br><span style="font-size: 13px; color: #6b7280;">Install Google Chrome if not installed</span></li>
+                                    <li style="margin: 8px 0;"><strong>Enable Desktop Mode</strong><br><span style="font-size: 13px; color: #6b7280;">Chrome menu (⋮) → Desktop site checkbox</span></li>
+                                    <li style="margin: 8px 0;"><strong>Clear Browser Cache</strong><br><span style="font-size: 13px; color: #6b7280;">Settings → Privacy → Clear cache → Reload</span></li>
+                                    <li style="margin: 8px 0;"><strong>Use on Computer</strong><br><code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 12px; display: inline-block; margin-top: 4px;">https://fvranjic.github.io/fit90/</code></li>
+                                </ol>
+                                
+                                <div style="margin-top: 25px; padding-top: 20px; border-top: 2px solid #e5e7eb;">
+                                    <button onclick="location.reload()" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; border: none; padding: 15px; border-radius: 10px; font-size: 16px; font-weight: bold; width: 100%; cursor: pointer; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
+                                        🔄 Reload & Try Again
+                                    </button>
+                                    <p style="text-align: center; font-size: 11px; color: #9ca3af; margin-top: 15px;">
+                                        Works best on: Chrome, Firefox, Safari (Desktop mode)
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }, 5000);
+        })();
+
         const { useState, useEffect } = React;
 
         // Lucide Icons as inline SVGs
